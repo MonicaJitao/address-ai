@@ -105,6 +105,13 @@ async def normalize_address(
             "score": 0,
         }
 
+    # 联动收紧：联网层出现歧义/冲突时，限制 online_score，避免总分虚高
+    l3_status = layer3.get("match_status", "")
+    if l3_status == "mismatch":
+        layer3["score"] = min(int(layer3.get("score", 0)), 25)
+    elif l3_status == "ambiguous_match":
+        layer3["score"] = min(int(layer3.get("score", 0)), 35)
+
     # ── 步骤 4：综合评分 ────────────────────────────────
     # translation_score：知识库校验通过说明翻译质量高，反映翻译置信度
     translation_score = layer2["score"]
@@ -119,6 +126,12 @@ async def normalize_address(
         online_score=layer3.get("score", 0),
         online_enabled=online_enabled,
     )
+
+    # 二次兜底：联网冲突时封顶总分，避免“明显错匹配却高分”
+    if l3_status == "mismatch":
+        scores["total_score"] = min(float(scores.get("total_score", 0)), 75.0)
+    elif l3_status == "ambiguous_match":
+        scores["total_score"] = min(float(scores.get("total_score", 0)), 82.0)
 
     elapsed_ms = int((time.monotonic() - start_time) * 1000)
     logger.info("地址标准化完成：total_score=%.1f, elapsed=%dms", scores["total_score"], elapsed_ms)

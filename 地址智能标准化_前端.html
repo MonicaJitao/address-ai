@@ -368,11 +368,21 @@
                 ? 'DEMO MODE — BACKEND OFFLINE'
                 : `VERIFIED VIA ${providerLabel} · ${safeModel}`;
 
-            // 2b. 解析 issues（后端 parsed.issues）
+            // 2b. issues 汇总（parsed + layer3_online）
             const pIssues = Array.isArray(parsed.issues) ? parsed.issues.filter(Boolean) : [];
-            if (pIssues.length > 0) {
+            const l3 = (validation && validation.layer3_online) ? validation.layer3_online : {};
+            const l3Issues = Array.isArray(l3.issues) ? l3.issues.filter(Boolean) : [];
+            const mergedIssues = [...pIssues, ...l3Issues];
+            const debugCandidates = Array.isArray(l3.debug_candidates) ? l3.debug_candidates : [];
+            if (debugCandidates.length > 0) {
+                const top = debugCandidates.slice(0, 2).map(c =>
+                    `候选(score=${c.score}, src=${c.source}, district=${c.district || '—'})`
+                );
+                mergedIssues.push(...top);
+            }
+            if (mergedIssues.length > 0) {
                 issuesSection.classList.remove('hidden');
-                issuesList.innerHTML = pIssues.map(i => `<li>${escapeHtml(String(i))}</li>`).join('');
+                issuesList.innerHTML = mergedIssues.map(i => `<li>${escapeHtml(String(i))}</li>`).join('');
             } else {
                 issuesSection.classList.add('hidden');
                 issuesList.innerHTML = '';
@@ -420,7 +430,6 @@
             // 5. 三层校验状态指示灯
             const l1 = validation.layer1_rules;
             const l2 = validation.layer2_knowledge;
-            const l3 = validation.layer3_online;
 
             // 工具：根据通过/失败返回指示灯颜色
             const dot = (passed) =>
@@ -431,6 +440,9 @@
                     partial_match: 'bg-yellow-500',
                     weak_match: 'bg-orange-500',
                     no_match: 'bg-red-500',
+                    ambiguous_match: 'bg-amber-500',
+                    mismatch: 'bg-rose-600',
+                    api_error: 'bg-yellow-600',
                 };
                 return `<div class="w-2 h-2 rounded-full ${colors[status] || 'bg-gray-700'}"></div>`;
             };
