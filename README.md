@@ -69,6 +69,11 @@ CLAUDE_PROXY_MODEL=claude-sonnet-4-6
 
 # 第三层联网验证（可选）
 AMAP_API_KEY=your_amap_api_key
+# 高德 Web 服务 QPS 与并发（默认 3 次/秒、最多 2 路并发，留余量防 10021）
+# AMAP_RATE_LIMIT_PER_SEC=3
+# AMAP_MAX_CONCURRENCY=2
+# AMAP_CACHE_TTL_SEC=60
+# AMAP_EARLY_STOP_SCORE=70
 
 # 服务参数
 HOST=0.0.0.0
@@ -149,6 +154,10 @@ python -m uvicorn main:app --reload --port 8000
   "processing_time_ms": 348
 }
 ```
+
+启用高德时，`validation.layer3_online` 除 `amap_address`、`match_status`、`score` 外，还可能包含：
+- `suggested_zh_address` / `suggested_zh_confidence` / `suggested_zh_reason`：通过第三层校验时的「可能更准确的中文表述」及置信说明
+- `amap_calls`、`queued_ms`、`early_stop_hit`、`rate_limited_count`、`cache_hits`：单次请求内高德调用与限流/缓存摘要
 
 ### `GET /api/health`
 

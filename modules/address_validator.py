@@ -13,6 +13,8 @@
 import os
 import re
 import json
+import time
+import asyncio
 import logging
 import difflib
 import httpx
@@ -36,6 +38,176 @@ AMAP_PLACE_TEXT_URL = "https://restapi.amap.com/v3/place/text"
 _AMAP_PASS_SCORE = 52
 _AMAP_AMBIGUOUS_LOW = 30
 _AMAP_TIE_GAP = 6
+
+# 高德 QPS / 并发 / 缓存 / 早停（可通过环境变量覆盖）
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)).strip() or default)
+    except ValueError:
+        return default
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)).strip() or default)
+    except ValueError:
+        return default
+
+
+# 进程级：全局限流 + 并发信号量 + 响应缓存（单 worker 内共享）
+_amap_rate_limiter: "_AsyncTokenBucket | None" = None
+_amap_concurrency_sem: asyncio.Semaphore | None = None
+_amap_cache_lock = asyncio.Lock()
+_amap_response_cache: dict[str, tuple[float, dict]] = {}
+
+
+class _AsyncTokenBucket:
+    """异步令牌桶：限制平均请求速率（如 3 req/s），返回本次等待毫秒数。"""
+
+    def __init__(self, rate_per_sec: float, capacity: float | None = None) -> None:
+        self.rate = max(0.1, rate_per_sec)
+        self.capacity = capacity if capacity is not None else self.rate
+        self._tokens = float(self.capacity)
+        self._updated = time.monotonic()
+        self._lock = asyncio.Lock()
+
+    async def consume(self, n: float = 1.0) -> float:
+        """消耗 n 个令牌，必要时等待；返回等待毫秒数。"""
+        waited = 0.0
+        while True:
+            async with self._lock:
+                now = time.monotonic()
+                elapsed = now - self._updated
+                self._updated = now
+                self._tokens = min(self.capacity, self._tokens + elapsed * self.rate)
+                if self._tokens >= n:
+                    self._tokens -= n
+                    return waited * 1000.0
+                need = n - self._tokens
+                sleep_sec = need / self.rate if self.rate > 0 else 0.05
+            await asyncio.sleep(sleep_sec)
+            waited += sleep_sec
+
+
+def _get_amap_rate_limiter() -> _AsyncTokenBucket:
+    global _amap_rate_limiter
+    if _amap_rate_limiter is None:
+        rps = _env_float("AMAP_RATE_LIMIT_PER_SEC", 3.0)
+        cap = min(rps, 3.0)
+        _amap_rate_limiter = _AsyncTokenBucket(rps, capacity=cap)
+    return _amap_rate_limiter
+
+
+def _get_amap_concurrency_sem() -> asyncio.Semaphore:
+    global _amap_concurrency_sem
+    if _amap_concurrency_sem is None:
+        n = max(1, _env_int("AMAP_MAX_CONCURRENCY", 2))
+        _amap_concurrency_sem = asyncio.Semaphore(n)
+    return _amap_concurrency_sem
+
+
+def _amap_cache_ttl_sec() -> float:
+    return max(0.0, _env_float("AMAP_CACHE_TTL_SEC", 60.0))
+
+
+def _amap_early_stop_score() -> int:
+    return max(_AMAP_PASS_SCORE, _env_int("AMAP_EARLY_STOP_SCORE", 70))
+
+
+def _cache_key_for_get(url: str, params: dict[str, str]) -> str:
+    items = sorted((k, str(v)) for k, v in params.items())
+    return url + "?" + json.dumps(items, ensure_ascii=False)
+
+
+def _source_priority_rank(source: str | None) -> int:
+    return {"geocode": 3, "place_text": 2, "inputtips": 1}.get(source or "", 0)
+
+
+def _completeness_hits(cand: dict) -> int:
+    n = 0
+    for k in ("province", "city", "district"):
+        if (cand.get(k) or "").strip():
+            n += 1
+    fa = (cand.get("formatted_address") or "").strip()
+    if fa:
+        n += 1
+    if fa and re.search(r"\d", fa):
+        n += 1
+    return n
+
+
+def _arbitrate_top_on_tie(
+    scored: list[tuple[int, dict, list[str], bool]],
+    tie_gap: int,
+) -> tuple[int, dict, list[str], bool]:
+    """
+    当顶分与后续候选分差小于 tie_gap 时，按来源优先级与字段完整度二次择优。
+    返回应作为「首选」的一条 (score, cand, reasons, hard_mismatch)。
+    """
+    if not scored:
+        raise ValueError("scored empty")
+    best_score, best_cand, best_rs, best_hm = scored[0]
+    second_score = scored[1][0] if len(scored) > 1 else -999
+    if (best_score - second_score) >= tie_gap:
+        return scored[0]
+    band: list[tuple[int, dict, list[str], bool]] = [
+        t for t in scored if t[0] >= best_score - tie_gap
+    ]
+    if len(band) <= 1:
+        return scored[0]
+
+    def sort_key(t: tuple[int, dict, list[str], bool]) -> tuple:
+        sc, c, _, hm = t
+        # hard_mismatch 置底；其余按分、来源、完整度
+        return (sc, 0 if hm else 1, _source_priority_rank(c.get("source")), _completeness_hits(c))
+
+    band.sort(key=sort_key, reverse=True)
+    chosen = band[0]
+    logger.info(
+        "高德并列仲裁: 分差<%d 时在 %d 条带内重排，选中 source=%s addr=%s",
+        tie_gap,
+        len(band),
+        chosen[1].get("source"),
+        (chosen[1].get("formatted_address") or "")[:120],
+    )
+    return chosen
+
+
+def _suggested_zh_confidence_reason(
+    passed: bool,
+    match_status: str,
+    best_score: int,
+    second_score: int,
+    near_top: int,
+    pick_source: str | None,
+) -> tuple[str, str]:
+    """
+    返回 (confidence, reason)。confidence: high | medium | low。
+    调用方仅在 passed 且非 mismatch 等场景下附带 suggested_zh_address。
+
+    口径（C）：strong_match 一律高置信；partial_match 再受分差/近分候选影响；weak_match 低置信。
+    """
+    if not passed or match_status in ("mismatch", "no_match", "api_error", "disabled", "skipped"):
+        return "", ""
+    gap = best_score - second_score
+    tie_like = gap < _AMAP_TIE_GAP
+    if match_status == "weak_match":
+        return "low", "仅区县/城市级命中，不建议作为强参考"
+    # 强命中：业务上优先信任，不因近分候选降级
+    if match_status == "strong_match":
+        return "high", "兴趣点/门牌级强命中（strong_match），中文参考按高置信展示"
+    # 道路级等部分命中：保留保守判断
+    if match_status == "partial_match":
+        if near_top >= 4:
+            return "low", "多条候选得分接近，建议人工核对"
+        if tie_like and best_score < 60:
+            return "low", "顶分与备选分差过小且分数偏低"
+        if tie_like:
+            return "medium", "存在得分接近的备选（partial_match）"
+        if pick_source == "geocode":
+            return "high", "地理编码直命中（道路级）"
+        return "medium", "已通过道路级/部分结构化匹配（partial_match）"
+    return "medium", "已通过联网校验阈值"
 
 # 常见「城市英文名 → 区县英文名关键词 → 高德 district 中应包含的汉字」
 # 用于在 LLM 仅输出英文区县时做弱约束（可按业务扩展）
@@ -639,11 +811,70 @@ def _match_status_from_level(level: str) -> tuple[str, float, int]:
     return "partial_match", 0.60, 65
 
 
+def _amap_telemetry_payload(stats: dict | None) -> dict:
+    st = stats or {}
+    return {
+        "amap_calls": int(st.get("amap_calls", 0)),
+        "queued_ms": round(float(st.get("queued_ms", 0.0)), 2),
+        "early_stop_hit": bool(st.get("early_stop_hit", False)),
+        "rate_limited_count": int(st.get("rate_limited_count", 0)),
+        "cache_hits": int(st.get("cache_hits", 0)),
+    }
+
+
+async def _amap_get_json(
+    client: httpx.AsyncClient,
+    url: str,
+    params: dict[str, str],
+    stats: dict,
+) -> dict:
+    """
+    统一高德 GET：并发信号量 + 令牌桶限流 + 可选短缓存 + 10021 退避重试。
+    """
+    ttl = _amap_cache_ttl_sec()
+    cache_key = _cache_key_for_get(url, params)
+    if ttl > 0:
+        async with _amap_cache_lock:
+            ent = _amap_response_cache.get(cache_key)
+            if ent and ent[0] > time.monotonic():
+                stats["cache_hits"] = int(stats.get("cache_hits", 0)) + 1
+                return ent[1]
+
+    sem = _get_amap_concurrency_sem()
+    limiter = _get_amap_rate_limiter()
+    backoffs = (0.35, 0.8, 1.6)
+    last_data: dict = {}
+
+    for attempt in range(len(backoffs) + 1):
+        async with sem:
+            wait_ms = await limiter.consume(1.0)
+            stats["queued_ms"] = float(stats.get("queued_ms", 0.0)) + wait_ms
+            stats["amap_calls"] = int(stats.get("amap_calls", 0)) + 1
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            last_data = resp.json()
+
+        inf = str(last_data.get("infocode", ""))
+        info_txt = str(last_data.get("info", "")).upper()
+        if inf == "10021" or "CUQPS" in info_txt:
+            stats["rate_limited_count"] = int(stats.get("rate_limited_count", 0)) + 1
+            if attempt < len(backoffs):
+                await asyncio.sleep(backoffs[attempt])
+                continue
+        if ttl > 0 and last_data.get("status") == "1":
+            async with _amap_cache_lock:
+                _amap_response_cache[cache_key] = (time.monotonic() + ttl, last_data)
+        return last_data
+
+    return last_data
+
+
 async def _fetch_input_tips(
     client: httpx.AsyncClient,
     keywords: str,
     city_limit: str | None,
     amap_key: str,
+    stats: dict,
 ) -> list[dict]:
     """调用高德 InputTips，用于拼音 / 英文 / 混合输入的候选召回。"""
     kw = (keywords or "").strip()[:256]
@@ -659,9 +890,7 @@ async def _fetch_input_tips(
     if city_limit:
         params["city"] = city_limit
     try:
-        resp = await client.get(AMAP_INPUTTIPS_URL, params=params)
-        resp.raise_for_status()
-        data = resp.json()
+        data = await _amap_get_json(client, AMAP_INPUTTIPS_URL, params, stats)
     except Exception as exc:
         logger.warning("高德 InputTips 请求失败：%s", exc)
         return []
@@ -707,6 +936,7 @@ async def _fetch_place_text(
     keywords: str,
     city_limit: str | None,
     amap_key: str,
+    stats: dict,
 ) -> list[dict]:
     """调用高德 place/text 做 POI 关键词补召回。"""
     kw = (keywords or "").strip()[:128]
@@ -724,9 +954,7 @@ async def _fetch_place_text(
     if city_limit:
         params["city"] = city_limit
     try:
-        resp = await client.get(AMAP_PLACE_TEXT_URL, params=params)
-        resp.raise_for_status()
-        data = resp.json()
+        data = await _amap_get_json(client, AMAP_PLACE_TEXT_URL, params, stats)
     except Exception as exc:
         logger.warning("高德 place/text 请求失败：%s", exc)
         return []
@@ -750,67 +978,153 @@ async def _collect_amap_candidates(
     formatted_text: str,
     amap_key: str,
     city_limit: str | None,
+    stats: dict,
 ) -> list[dict]:
-    """汇总 InputTips + 多条 geocode 的全部候选。"""
+    """
+    汇总 geocode + place/text + InputTips 候选。
+    顺序：地理编码优先 → POI 补召回 → InputTips；支持早停、去重、受控并发与全局限流。
+    """
     rows: list[dict] = []
     normalized_queries = _normalized_query_candidates(raw_address, parsed, formatted_text)
     kw_primary = normalized_queries[0] if normalized_queries else ""
-
-    for kw in normalized_queries[:3]:
-        tips = await _fetch_input_tips(client, kw, city_limit, amap_key)
-        logger.info(
-            "高德 InputTips: keywords=%r city_limit=%r 条数=%d",
-            kw[:120],
-            city_limit,
-            len(tips),
+    geo_queries = list(
+        dict.fromkeys(
+            normalized_queries
+            or _geocode_query_candidates(raw_address, parsed, formatted_text)
         )
-        for tip in tips[:15]:
-            rows.append(_candidate_from_input_tip(tip, kw))
-            logger.debug(
-                "InputTips 候选: name=%s district=%s city=%s",
-                tip.get("name"),
-                tip.get("district"),
-                _tip_city_name(tip),
-            )
+    )
 
-    # place/text：对楼宇/POI关键词补召回
-    place_keywords = _extract_place_keywords(kw_primary or raw_address, parsed)
-    for kw in place_keywords:
-        pois = await _fetch_place_text(client, kw, city_limit, amap_key)
-        logger.info("高德 place/text: keywords=%r city_limit=%r 条数=%d", kw[:80], city_limit, len(pois))
-        for poi in pois[:10]:
-            rows.append(_candidate_from_place_poi(poi, kw))
-
-    geo_queries = normalized_queries or _geocode_query_candidates(raw_address, parsed, formatted_text)
+    early_thr = _amap_early_stop_score()
+    early_stop = False
+    max_batch = max(1, _env_int("AMAP_MAX_CONCURRENCY", 2))
+    geo_attempt = [0]
     last_geo_exc: Exception | None = None
-    for attempt, query in enumerate(geo_queries, start=1):
-        params: dict[str, str] = {"address": query, "key": amap_key, "output": "json"}
+
+    async def _run_geo(q_inner: str) -> tuple[list[dict], bool]:
+        params_g: dict[str, str] = {
+            "address": q_inner,
+            "key": amap_key,
+            "output": "json",
+        }
         if city_limit:
-            params["city"] = city_limit
+            params_g["city"] = city_limit
         try:
-            resp = await client.get(AMAP_GEOCODE_URL, params=params)
-            resp.raise_for_status()
-            data = resp.json()
+            geo_attempt[0] += 1
+            att = geo_attempt[0]
+            data = await _amap_get_json(client, AMAP_GEOCODE_URL, params_g, stats)
         except Exception as exc:
-            last_geo_exc = exc
             logger.warning(
                 "高德 geocode 第 %d/%d 次异常: %s",
-                attempt,
+                geo_attempt[0],
                 len(geo_queries),
                 exc,
             )
-            continue
-        _log_amap_geocode_response(query, data, attempt)
+            return ([], False, exc)
+        _log_amap_geocode_response(q_inner, data, att)
         if data.get("status") != "1":
-            continue
+            return ([], False, None)
+        acc: list[dict] = []
+        st_local = False
         for gc in data.get("geocodes") or []:
-            if isinstance(gc, dict):
-                rows.append(_candidate_from_geocode_row(gc, query))
+            if not isinstance(gc, dict):
+                continue
+            cand = _candidate_from_geocode_row(gc, q_inner)
+            acc.append(cand)
+            sc, _, hm = _score_amap_candidate(parsed, raw_address, cand)
+            if (
+                (not hm)
+                and sc >= early_thr
+                and _level_rank(cand.get("level", "")) >= 2
+            ):
+                st_local = True
+        return (acc, st_local, None)
 
-    if not rows and last_geo_exc is not None:
+    # ── Phase 1：地理编码（优先，小批量 gather）────────────────
+    gi = 0
+    while gi < len(geo_queries) and not early_stop:
+        batch = geo_queries[gi : gi + max_batch]
+        gi += len(batch)
+        results = await asyncio.gather(*[_run_geo(q) for q in batch])
+        for subrows, st_hit, geo_exc in results:
+            if geo_exc is not None:
+                last_geo_exc = geo_exc
+            rows.extend(subrows)
+            if st_hit:
+                early_stop = True
+                stats["early_stop_hit"] = True
+                logger.info(
+                    "高德早停: 地理编码一致性>=%d 且 level 不低于道路级",
+                    early_thr,
+                )
+                break
+
+    # ── Phase 2：place/text（早停则跳过）──────────────────────
+    if not early_stop:
+        place_keywords = _extract_place_keywords(kw_primary or raw_address, parsed)
+        pi = 0
+        while pi < len(place_keywords):
+            batch = place_keywords[pi : pi + max_batch]
+            pi += len(batch)
+
+            async def _one_place(kw: str) -> list[dict]:
+                pois = await _fetch_place_text(client, kw, city_limit, amap_key, stats)
+                logger.info(
+                    "高德 place/text: keywords=%r city_limit=%r 条数=%d",
+                    kw[:80],
+                    city_limit,
+                    len(pois),
+                )
+                out_local: list[dict] = []
+                for poi in pois[:10]:
+                    out_local.append(_candidate_from_place_poi(poi, kw))
+                return out_local
+
+            batches = await asyncio.gather(*[_one_place(kw) for kw in batch])
+            for bl in batches:
+                rows.extend(bl)
+
+    # ── Phase 3：InputTips（早停则跳过）───────────────────────
+    if not early_stop:
+        tip_queries = normalized_queries[:3]
+        ti = 0
+        while ti < len(tip_queries):
+            batch = tip_queries[ti : ti + max_batch]
+            ti += len(batch)
+
+            async def _one_tips(kw: str) -> list[dict]:
+                tips = await _fetch_input_tips(client, kw, city_limit, amap_key, stats)
+                logger.info(
+                    "高德 InputTips: keywords=%r city_limit=%r 条数=%d",
+                    kw[:120],
+                    city_limit,
+                    len(tips),
+                )
+                out_local: list[dict] = []
+                for tip in tips[:15]:
+                    out_local.append(_candidate_from_input_tip(tip, kw))
+                    logger.debug(
+                        "InputTips 候选: name=%s district=%s city=%s",
+                        tip.get("name"),
+                        tip.get("district"),
+                        _tip_city_name(tip),
+                    )
+                return out_local
+
+            for bl in await asyncio.gather(*[_one_tips(kw) for kw in batch]):
+                rows.extend(bl)
+
+    deduped = _dedupe_amap_candidates(rows)
+    if not deduped and last_geo_exc is not None:
         raise last_geo_exc
-
-    return _dedupe_amap_candidates(rows)
+    logger.info(
+        "高德请求摘要: calls=%s queued_ms=%.1f early_stop=%s rate_limited=%s cache_hits=%s",
+        stats.get("amap_calls", 0),
+        float(stats.get("queued_ms", 0.0)),
+        stats.get("early_stop_hit", False),
+        stats.get("rate_limited_count", 0),
+        stats.get("cache_hits", 0),
+    )
+    return deduped
 
 
 async def validate_layer3_online(
@@ -824,6 +1138,7 @@ async def validate_layer3_online(
     match_status 在 strong_match / partial_match / weak_match / no_match 之外，
     可能为 ambiguous_match（多候选难分）或 mismatch（与解析结构明显矛盾）。
     """
+    tel0 = _amap_telemetry_payload({})
     amap_key = os.getenv("AMAP_API_KEY", "").strip()
     if not amap_key:
         return {
@@ -835,6 +1150,7 @@ async def validate_layer3_online(
             "amap_address": "",
             "issues": [],
             "score": 0,
+            **tel0,
         }
 
     if not _normalized_query_candidates(raw_address, parsed, formatted_text):
@@ -847,14 +1163,22 @@ async def validate_layer3_online(
             "amap_address": "",
             "issues": ["缺少可用于地理编码的地址文本"],
             "score": 20,
+            **tel0,
         }
 
+    stats: dict = {
+        "amap_calls": 0,
+        "queued_ms": 0.0,
+        "early_stop_hit": False,
+        "rate_limited_count": 0,
+        "cache_hits": 0,
+    }
     city_limit = _city_limit_for_amap(parsed)
     candidates: list[dict] = []
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             candidates = await _collect_amap_candidates(
-                client, raw_address, parsed, formatted_text, amap_key, city_limit
+                client, raw_address, parsed, formatted_text, amap_key, city_limit, stats
             )
     except Exception as exc:
         logger.warning("高德 API 调用失败：%s", exc)
@@ -867,6 +1191,7 @@ async def validate_layer3_online(
             "amap_address": "",
             "issues": [f"联网验证请求失败：{exc}"],
             "score": 50,
+            **_amap_telemetry_payload(stats),
         }
 
     if not candidates:
@@ -881,6 +1206,7 @@ async def validate_layer3_online(
                 "高德未返回可用候选（InputTips 与地理编码均无结果），请检查输入或稍后再试",
             ],
             "score": 20,
+            **_amap_telemetry_payload(stats),
         }
 
     scored: list[tuple[int, dict, list[str], bool]] = []
@@ -889,8 +1215,6 @@ async def validate_layer3_online(
         scored.append((sc, cand, rs, hm))
     scored.sort(key=lambda x: x[0], reverse=True)
 
-    best_score, best_cand, best_reasons, best_hard_mismatch = scored[0]
-    second_score = scored[1][0] if len(scored) > 1 else -999
     debug_enabled = os.getenv("DEBUG", "false").lower() == "true"
     debug_candidates = [
         {
@@ -903,6 +1227,13 @@ async def validate_layer3_online(
         }
         for s, c, _, hm in scored[:3]
     ]
+
+    chosen = _arbitrate_top_on_tie(scored, _AMAP_TIE_GAP)
+    rest = [t for t in scored if t[1] is not chosen[1]]
+    rest.sort(key=lambda x: x[0], reverse=True)
+    second_score = rest[0][0] if rest else -999
+
+    best_score, best_cand, best_reasons, best_hard_mismatch = chosen
 
     logger.info(
         "高德候选择优: best_score=%d source=%s query=%r addr=%s",
@@ -921,6 +1252,8 @@ async def validate_layer3_online(
         )
 
     tie_like = (best_score - second_score) < _AMAP_TIE_GAP
+    tel = _amap_telemetry_payload(stats)
+    dbg = {"debug_candidates": debug_candidates} if debug_enabled else {}
 
     if best_hard_mismatch:
         return {
@@ -938,7 +1271,8 @@ async def validate_layer3_online(
             "consistency_score": best_score,
             "amap_pick_source": best_cand.get("source"),
             "amap_pick_query": best_cand.get("query_used"),
-            **({"debug_candidates": debug_candidates} if debug_enabled else {}),
+            **tel,
+            **dbg,
         }
 
     if best_score < _AMAP_AMBIGUOUS_LOW:
@@ -957,7 +1291,8 @@ async def validate_layer3_online(
             "consistency_score": best_score,
             "amap_pick_source": best_cand.get("source"),
             "amap_pick_query": best_cand.get("query_used"),
-            **({"debug_candidates": debug_candidates} if debug_enabled else {}),
+            **tel,
+            **dbg,
         }
 
     # 未达通过阈值：视为模糊或不可信
@@ -977,7 +1312,8 @@ async def validate_layer3_online(
             "consistency_score": best_score,
             "amap_pick_source": best_cand.get("source"),
             "amap_pick_query": best_cand.get("query_used"),
-            **({"debug_candidates": debug_candidates} if debug_enabled else {}),
+            **tel,
+            **dbg,
         }
 
     # 已达通过阈值，但顶分候选过于接近：仍判歧义，避免误命中
@@ -997,7 +1333,8 @@ async def validate_layer3_online(
             "consistency_score": best_score,
             "amap_pick_source": best_cand.get("source"),
             "amap_pick_query": best_cand.get("query_used"),
-            **({"debug_candidates": debug_candidates} if debug_enabled else {}),
+            **tel,
+            **dbg,
         }
 
     level = best_cand.get("level", "")
@@ -1013,9 +1350,34 @@ async def validate_layer3_online(
     final_score = _online_score_from_consistency(True, match_status, best_score)
     final_score = min(final_score, base_score)
 
+    passed = match_status in ("strong_match", "partial_match")
+    suggested_pack: dict = {}
+    if passed:
+        zh_addr = (best_cand.get("formatted_address") or "").strip()
+        szh_conf, szh_reason = _suggested_zh_confidence_reason(
+            True,
+            match_status,
+            best_score,
+            second_score,
+            near_top,
+            best_cand.get("source"),
+        )
+        if zh_addr and szh_conf:
+            suggested_pack = {
+                "suggested_zh_address": zh_addr,
+                "suggested_zh_confidence": szh_conf,
+                "suggested_zh_reason": szh_reason,
+            }
+            logger.info(
+                "推荐中文参考: addr=%s confidence=%s reason=%s",
+                zh_addr[:120],
+                szh_conf,
+                szh_reason,
+            )
+
     return {
         "enabled": True,
-        "passed": match_status in ("strong_match", "partial_match"),
+        "passed": passed,
         "match_status": match_status,
         "provider": "amap",
         "provider_confidence": confidence,
@@ -1025,7 +1387,9 @@ async def validate_layer3_online(
         "consistency_score": best_score,
         "amap_pick_source": best_cand.get("source"),
         "amap_pick_query": best_cand.get("query_used"),
-        **({"debug_candidates": debug_candidates} if debug_enabled else {}),
+        **tel,
+        **suggested_pack,
+        **dbg,
     }
 
 
