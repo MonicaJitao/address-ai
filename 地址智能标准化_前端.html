@@ -47,19 +47,34 @@
         /* 动画延迟（阶梯式入场效果） */
         .stagger-1 { animation-delay: 100ms; }
         .stagger-2 { animation-delay: 200ms; }
-        .stagger-25 { animation-delay: 250ms; }
         .stagger-3 { animation-delay: 300ms; }
         .stagger-4 { animation-delay: 400ms; }
-        .stagger-5 { animation-delay: 500ms; }
         /* 隐藏滚动条但保留滚动能力 */
         .hide-scroll::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="bg-bglight text-gray-900 font-sans min-h-screen w-screen lg:h-screen lg:overflow-hidden flex items-center justify-center p-4 lg:p-12">
 
-    <!-- 主容器：左侧输入 + 右侧解析结果 -->
-    <main class="w-full max-w-7xl h-auto lg:h-full bg-surface shadow-2xl flex flex-col lg:flex-row overflow-hidden rounded-xl lg:rounded-none border border-gray-100">
+    <!-- 主容器：模式切换 + 内容区 -->
+    <main class="w-full max-w-7xl h-auto lg:h-full bg-surface shadow-2xl overflow-hidden rounded-xl lg:rounded-none border border-gray-100 flex flex-col">
+        <div class="px-6 lg:px-10 py-5 border-b border-gray-100 bg-white/95 backdrop-blur">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <p class="text-primary font-bold tracking-widest text-[10px] uppercase mb-2">WB · AI Tools</p>
+                    <p class="text-gray-400 text-xs font-mono uppercase tracking-[0.25em]">Operating Mode</p>
+                </div>
+                <div class="inline-flex border border-gray-200 overflow-hidden shadow-sm">
+                    <button id="singleModeBtn" type="button" class="mode-tab-btn px-5 py-3 text-xs font-mono uppercase tracking-[0.25em] transition-colors bg-primary text-white">
+                        Single
+                    </button>
+                    <button id="batchModeBtn" type="button" class="mode-tab-btn px-5 py-3 text-xs font-mono uppercase tracking-[0.25em] transition-colors text-gray-600 border-l border-gray-200 hover:bg-gray-50">
+                        Batch
+                    </button>
+                </div>
+            </div>
+        </div>
 
+        <div id="singleView" class="flex flex-col lg:flex-row flex-1 overflow-hidden">
         <!-- ══ 左侧：输入面板 ══════════════════════════════ -->
         <section class="w-full lg:w-5/12 h-auto lg:h-full flex flex-col relative z-10 p-6 lg:p-16">
             <!-- 品牌标识 -->
@@ -166,8 +181,23 @@
                     </div>
                 </header>
 
-                <!-- 标准化输出地址（主交付，紧随置信度） -->
-                <div class="opacity-0 animate-fade-up stagger-2 mb-8 flex-grow">
+                <!-- 结构化字段网格 -->
+                <div class="mb-10 opacity-0 animate-fade-up stagger-2">
+                    <h3 class="text-xs text-gray-500 font-mono tracking-widest uppercase mb-4">
+                        Structured Entities
+                    </h3>
+                    <!-- 由 JS 动态填充 -->
+                    <div id="entityGrid"
+                        class="grid grid-cols-2 lg:grid-cols-3 gap-px bg-gray-800/50 border border-gray-800/50">
+                    </div>
+                    <div id="issuesSection" class="hidden mt-4 p-3 border border-yellow-500/20 bg-yellow-500/5 rounded-sm">
+                        <p class="text-yellow-400 text-xs font-mono uppercase mb-2">Parse Issues</p>
+                        <ul id="issuesList" class="text-yellow-300 text-xs font-mono space-y-1 list-disc list-inside"></ul>
+                    </div>
+                </div>
+
+                <!-- 标准化输出地址 -->
+                <div class="opacity-0 animate-fade-up stagger-3 flex-grow">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-xs text-primary font-mono tracking-widest uppercase">
                             Standardized Output
@@ -190,61 +220,148 @@
                     </div>
                 </div>
 
-                <!-- 结构化字段网格 -->
-                <div class="mb-10 opacity-0 animate-fade-up stagger-3">
-                    <h3 class="text-xs text-gray-500 font-mono tracking-widest uppercase mb-4">
-                        Structured Entities
-                    </h3>
-                    <!-- 由 JS 动态填充 -->
-                    <div id="entityGrid"
-                        class="grid grid-cols-2 lg:grid-cols-3 gap-px bg-gray-800/50 border border-gray-800/50">
-                    </div>
-                    <div id="issuesSection" class="hidden mt-4 p-3 border border-yellow-500/20 bg-yellow-500/5 rounded-sm">
-                        <p class="text-yellow-400 text-xs font-mono uppercase mb-2">Parse Issues</p>
-                        <ul id="issuesList" class="text-yellow-300 text-xs font-mono space-y-1 list-disc list-inside"></ul>
-                    </div>
-                </div>
-
-                <!-- 中文参考（高德核验，副视觉琥珀线） -->
-                <div id="zhReferenceSection" class="hidden mb-8 opacity-0 animate-fade-up stagger-4">
-                    <div class="flex justify-between items-start mb-3 gap-3">
-                        <div>
-                            <p class="text-[10px] text-amber-500/90 font-mono tracking-[0.2em] uppercase mb-1">CN Reference</p>
-                            <h3 class="text-xs text-gray-400 font-mono tracking-widest uppercase">可能更准确的中文表述</h3>
-                        </div>
-                        <div class="flex items-center gap-2 shrink-0">
-                            <span id="zhRefBadge" class="hidden text-[10px] font-mono uppercase px-2 py-0.5 rounded border"></span>
-                            <button type="button" id="copyZhBtn"
-                                class="text-gray-400 hover:text-amber-200 transition-colors"
-                                title="复制中文参考">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5"
-                                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="bg-darksurface/80 border-l-2 border-amber-500/80 p-5 rounded-sm shadow-inner">
-                        <p id="zhReferenceText" class="font-serif text-base text-gray-100 leading-relaxed tracking-wide"></p>
-                        <p id="zhReferenceMeta" class="text-[10px] text-gray-500 font-mono mt-3 leading-relaxed"></p>
-                    </div>
-                    <p class="mt-3 text-[11px] text-gray-500 leading-snug max-w-xl">
-                        把上方中文写回左侧输入框并再跑一遍解析与联网校验（会覆盖当前输入）。
-                    </p>
-                    <button type="button" id="adoptZhBtn"
-                        title="用推荐中文覆盖左侧输入框并自动点击解析"
-                        class="mt-2 inline-block text-[11px] font-mono uppercase tracking-wider text-amber-400 hover:text-amber-200 transition-colors border border-amber-500/30 hover:border-amber-400/50 rounded px-3 py-2">
-                        写入左侧并重跑
-                    </button>
-                </div>
-
                 <!-- 底部：三层校验状态指示灯 -->
-                <div class="mt-auto pt-8 border-t border-gray-800 opacity-0 animate-fade-up stagger-5 flex flex-wrap gap-4 lg:gap-6">
+                <div class="mt-auto pt-8 border-t border-gray-800 opacity-0 animate-fade-up stagger-4 flex flex-wrap gap-4 lg:gap-6">
                     <div id="layer1Status" class="flex items-center gap-2"></div>
                     <div id="layer2Status" class="flex items-center gap-2"></div>
                     <div id="layer3Status" class="flex items-center gap-2"></div>
                 </div>
 
+            </div>
+        </section>
+        </div>
+
+        <section id="batchView" class="hidden flex-1 bg-darkvault text-white noise-bg">
+            <div class="w-full h-full flex flex-col lg:flex-row">
+                <section class="w-full lg:w-5/12 bg-surface text-gray-900 p-6 lg:p-12 border-r border-gray-100 flex flex-col">
+                    <div class="mb-8">
+                        <p class="text-primary font-bold tracking-widest text-xs uppercase mb-3">Batch Processing</p>
+                        <h2 class="font-serif text-3xl lg:text-4xl leading-tight text-gray-900">
+                            Address<br><span class="italic text-gray-500">Convoy.</span>
+                        </h2>
+                        <p class="text-gray-500 text-sm mt-5 leading-relaxed max-w-md">
+                            上传 CSV / Excel，或直接粘贴多行地址。系统将按完成顺序返回结果，并按原始序号回填。
+                        </p>
+                    </div>
+
+                    <div class="inline-flex border border-gray-200 overflow-hidden shadow-sm mb-6 self-start">
+                        <button id="batchSourceUploadBtn" type="button" class="batch-source-btn px-4 py-2 text-xs font-mono uppercase bg-primary text-white">
+                            Upload File
+                        </button>
+                        <button id="batchSourcePasteBtn" type="button" class="batch-source-btn px-4 py-2 text-xs font-mono uppercase text-gray-600 border-l border-gray-200 hover:bg-gray-50">
+                            Paste Text
+                        </button>
+                    </div>
+
+                    <div id="batchUploadPanel" class="space-y-4">
+                        <input id="batchFileInput" type="file" accept=".csv,.xlsx" class="hidden">
+                        <button id="batchDropzone" type="button" class="w-full border border-dashed border-gray-300 hover:border-primary transition-colors p-6 text-left group">
+                            <p class="text-xs font-mono uppercase tracking-[0.25em] text-gray-400 mb-3">File Intake</p>
+                            <p class="font-serif text-2xl text-gray-800 leading-snug">Drop a `.csv` or `.xlsx` here, or click to select.</p>
+                            <p id="batchFileMeta" class="mt-4 text-xs font-mono uppercase tracking-[0.2em] text-gray-400">No file selected</p>
+                        </button>
+                        <p class="text-[11px] text-gray-400 leading-relaxed">
+                            本版本支持 `.csv` 与 `.xlsx`。若地址列不是 `address`，可在下方手动指定列名。
+                        </p>
+                    </div>
+
+                    <div id="batchTextPanel" class="hidden">
+                        <textarea id="batchTextInput" rows="10" class="w-full text-left text-lg leading-relaxed bg-transparent border border-gray-200 outline-none resize-none p-4 hide-scroll placeholder-gray-300 font-serif text-gray-800 focus:border-primary transition-colors" placeholder="每行一条地址&#10;例如：&#10;深圳市南山区科技园南区1号&#10;北京市朝阳区建国路88号"></textarea>
+                    </div>
+
+                    <div class="mt-6 pt-6 border-t border-gray-100 space-y-5">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <span class="text-[10px] text-gray-400 font-mono uppercase tracking-widest">Provider</span>
+                            <div class="inline-flex rounded border border-gray-200 overflow-hidden shadow-sm">
+                                <button type="button" data-batch-provider="deepseek" class="batch-provider-btn px-4 py-2 text-xs font-mono uppercase transition-colors">
+                                    DeepSeek
+                                </button>
+                                <button type="button" data-batch-provider="claude" class="batch-provider-btn px-4 py-2 text-xs font-mono uppercase transition-colors border-l border-gray-200">
+                                    Claude
+                                </button>
+                            </div>
+                        </div>
+
+                        <label class="flex items-center justify-between gap-4 border border-gray-200 px-4 py-3">
+                            <div>
+                                <p class="text-[10px] text-gray-400 font-mono uppercase tracking-[0.25em]">Online Verify</p>
+                                <p class="text-xs text-gray-500 mt-1">默认关闭，避免高德限流放大批量耗时。</p>
+                            </div>
+                            <input id="batchOnlineVerify" type="checkbox" class="h-4 w-4 accent-primary">
+                        </label>
+
+                        <label class="block">
+                            <span class="text-[10px] text-gray-400 font-mono uppercase tracking-[0.25em]">Address Column</span>
+                            <input id="batchAddressColumn" type="text" value="address" class="mt-2 w-full border border-gray-200 px-4 py-3 text-sm text-gray-800 outline-none focus:border-primary transition-colors font-mono">
+                        </label>
+                    </div>
+
+                    <div class="mt-auto pt-8 flex flex-wrap items-center justify-between gap-4">
+                        <div id="batchStatusText" class="text-xs text-gray-400 font-mono uppercase tracking-[0.2em]">Awaiting Batch Input</div>
+                        <div class="flex items-center gap-3">
+                            <button id="batchCancelBtn" type="button" class="hidden border border-gray-300 text-gray-600 px-5 py-3 text-xs font-mono uppercase tracking-[0.2em] hover:border-gray-500 transition-colors">
+                                Cancel
+                            </button>
+                            <button id="batchRunBtn" type="button" class="bg-primary text-white px-8 py-4 font-semibold tracking-wide text-sm hover:bg-blue-700 transition-colors uppercase flex items-center gap-3 group">
+                                <span id="batchRunBtnText">Run Batch</span>
+                                <svg class="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="w-full lg:w-7/12 min-h-[60vh] p-6 lg:p-12 flex flex-col overflow-hidden">
+                    <div id="batchEmptyState" class="flex-1 flex items-center justify-center flex-col text-center">
+                        <svg class="w-16 h-16 text-gray-800 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1" d="M4 7h16M4 12h16M4 17h10M7 4v16m10-7l2 2 4-4"></path>
+                        </svg>
+                        <p class="font-mono text-gray-600 text-sm tracking-widest uppercase">Batch Standby</p>
+                    </div>
+
+                    <div id="batchResultsState" class="hidden h-full flex flex-col">
+                        <header class="border-b border-gray-800 pb-6 mb-6">
+                            <div class="flex flex-wrap items-end justify-between gap-4">
+                                <div>
+                                    <p class="text-xs text-primary font-mono tracking-[0.25em] uppercase mb-2">Batch Telemetry</p>
+                                    <h3 class="font-serif text-3xl text-white">Processing Ledger</h3>
+                                </div>
+                                <div class="text-right">
+                                    <p id="batchProgressText" class="text-sm font-mono uppercase tracking-[0.2em] text-gray-400">0 / 0 Processed</p>
+                                    <p id="batchSummaryMini" class="text-[10px] font-mono uppercase tracking-[0.2em] text-gray-600 mt-2">Pending...</p>
+                                </div>
+                            </div>
+                            <div class="mt-5 h-1 w-full bg-gray-900 overflow-hidden">
+                                <div id="batchProgressBar" class="h-full w-0 bg-primary transition-all duration-300"></div>
+                            </div>
+                        </header>
+
+                        <div class="flex-1 overflow-auto hide-scroll border border-gray-800">
+                            <table class="w-full border-collapse text-sm">
+                                <thead class="sticky top-0 bg-darkvault/95 backdrop-blur">
+                                    <tr class="border-b border-gray-800 text-[10px] font-mono uppercase tracking-[0.2em] text-gray-500">
+                                        <th class="text-left px-4 py-3 w-16">#</th>
+                                        <th class="text-left px-4 py-3">Raw Address</th>
+                                        <th class="text-left px-4 py-3">Standardized Output</th>
+                                        <th class="text-left px-4 py-3 w-24">Score</th>
+                                        <th class="text-left px-4 py-3 w-28">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="batchTableBody"></tbody>
+                            </table>
+                        </div>
+
+                        <footer class="pt-6 mt-6 border-t border-gray-800 flex flex-wrap items-center justify-between gap-4">
+                            <div id="batchFinalSummary" class="text-xs font-mono uppercase tracking-[0.2em] text-gray-400">
+                                0 Success · 0 Failed · Avg Score 0%
+                            </div>
+                            <button id="batchDownloadBtn" type="button" class="border border-primary/30 text-primary px-5 py-3 text-xs font-mono uppercase tracking-[0.2em] hover:bg-primary hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                                Download CSV
+                            </button>
+                        </footer>
+                    </div>
+                </section>
             </div>
         </section>
     </main>
@@ -281,18 +398,82 @@
         const layer3Status = document.getElementById('layer3Status');
         const issuesSection = document.getElementById('issuesSection');
         const issuesList = document.getElementById('issuesList');
-        const zhReferenceSection = document.getElementById('zhReferenceSection');
-        const zhReferenceText = document.getElementById('zhReferenceText');
-        const zhReferenceMeta = document.getElementById('zhReferenceMeta');
-        const zhRefBadge = document.getElementById('zhRefBadge');
-        const copyZhBtn = document.getElementById('copyZhBtn');
-        const adoptZhBtn = document.getElementById('adoptZhBtn');
         const providerBtns = document.querySelectorAll('.provider-btn');
+        const singleModeBtn = document.getElementById('singleModeBtn');
+        const batchModeBtn = document.getElementById('batchModeBtn');
+        const singleView = document.getElementById('singleView');
+        const batchView = document.getElementById('batchView');
+        const batchSourceUploadBtn = document.getElementById('batchSourceUploadBtn');
+        const batchSourcePasteBtn = document.getElementById('batchSourcePasteBtn');
+        const batchUploadPanel = document.getElementById('batchUploadPanel');
+        const batchTextPanel = document.getElementById('batchTextPanel');
+        const batchFileInput = document.getElementById('batchFileInput');
+        const batchDropzone = document.getElementById('batchDropzone');
+        const batchFileMeta = document.getElementById('batchFileMeta');
+        const batchTextInput = document.getElementById('batchTextInput');
+        const batchProviderBtns = document.querySelectorAll('.batch-provider-btn');
+        const batchOnlineVerify = document.getElementById('batchOnlineVerify');
+        const batchAddressColumn = document.getElementById('batchAddressColumn');
+        const batchStatusText = document.getElementById('batchStatusText');
+        const batchCancelBtn = document.getElementById('batchCancelBtn');
+        const batchRunBtn = document.getElementById('batchRunBtn');
+        const batchRunBtnText = document.getElementById('batchRunBtnText');
+        const batchEmptyState = document.getElementById('batchEmptyState');
+        const batchResultsState = document.getElementById('batchResultsState');
+        const batchProgressText = document.getElementById('batchProgressText');
+        const batchSummaryMini = document.getElementById('batchSummaryMini');
+        const batchProgressBar = document.getElementById('batchProgressBar');
+        const batchTableBody = document.getElementById('batchTableBody');
+        const batchFinalSummary = document.getElementById('batchFinalSummary');
+        const batchDownloadBtn = document.getElementById('batchDownloadBtn');
 
         // 当前格式化地址文本（用于复制功能）
         let currentFormattedText = '';
-        let currentZhReferenceText = '';
         let selectedProvider = 'deepseek';
+        let activeMode = 'single';
+        let batchSourceMode = 'upload';
+        let batchSelectedProvider = 'deepseek';
+        let batchSelectedFile = null;
+        let batchAbortController = null;
+        let batchRows = [];
+
+        function setMode(mode) {
+            activeMode = mode;
+            const singleActive = mode === 'single';
+            singleView.classList.toggle('hidden', !singleActive);
+            batchView.classList.toggle('hidden', singleActive);
+
+            singleModeBtn.classList.toggle('bg-primary', singleActive);
+            singleModeBtn.classList.toggle('text-white', singleActive);
+            singleModeBtn.classList.toggle('text-gray-600', !singleActive);
+            singleModeBtn.classList.toggle('hover:bg-gray-50', !singleActive);
+
+            batchModeBtn.classList.toggle('bg-primary', !singleActive);
+            batchModeBtn.classList.toggle('text-white', !singleActive);
+            batchModeBtn.classList.toggle('text-gray-600', singleActive);
+            batchModeBtn.classList.toggle('hover:bg-gray-50', singleActive);
+
+            if (singleActive) {
+                cancelBatchRun();
+            }
+        }
+
+        function setBatchSourceMode(mode) {
+            batchSourceMode = mode;
+            const uploadOn = mode === 'upload';
+            batchUploadPanel.classList.toggle('hidden', !uploadOn);
+            batchTextPanel.classList.toggle('hidden', uploadOn);
+
+            batchSourceUploadBtn.classList.toggle('bg-primary', uploadOn);
+            batchSourceUploadBtn.classList.toggle('text-white', uploadOn);
+            batchSourceUploadBtn.classList.toggle('text-gray-600', !uploadOn);
+            batchSourceUploadBtn.classList.toggle('hover:bg-gray-50', !uploadOn);
+
+            batchSourcePasteBtn.classList.toggle('bg-primary', !uploadOn);
+            batchSourcePasteBtn.classList.toggle('text-white', !uploadOn);
+            batchSourcePasteBtn.classList.toggle('text-gray-600', uploadOn);
+            batchSourcePasteBtn.classList.toggle('hover:bg-gray-50', uploadOn);
+        }
 
         function updateProviderUI() {
             providerBtns.forEach(btn => {
@@ -304,13 +485,39 @@
                 btn.classList.toggle('hover:bg-gray-50', !on);
             });
         }
+
+        function updateBatchProviderUI() {
+            batchProviderBtns.forEach(btn => {
+                const p = btn.getAttribute('data-batch-provider');
+                const on = p === batchSelectedProvider;
+                btn.classList.toggle('bg-primary', on);
+                btn.classList.toggle('text-white', on);
+                btn.classList.toggle('text-gray-600', !on);
+                btn.classList.toggle('hover:bg-gray-50', !on);
+            });
+        }
+
         providerBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 selectedProvider = btn.getAttribute('data-provider') || 'deepseek';
                 updateProviderUI();
             });
         });
+        batchProviderBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                batchSelectedProvider = btn.getAttribute('data-batch-provider') || 'deepseek';
+                updateBatchProviderUI();
+            });
+        });
+        singleModeBtn.addEventListener('click', () => setMode('single'));
+        batchModeBtn.addEventListener('click', () => setMode('batch'));
+        batchSourceUploadBtn.addEventListener('click', () => setBatchSourceMode('upload'));
+        batchSourcePasteBtn.addEventListener('click', () => setBatchSourceMode('paste'));
+        batchDropzone.addEventListener('click', () => batchFileInput.click());
         updateProviderUI();
+        updateBatchProviderUI();
+        setMode('single');
+        setBatchSourceMode('upload');
 
         // ── 输入框聚焦动画 ──────────────────────────────────
         input.addEventListener('focus', () => {
@@ -370,25 +577,12 @@
                 validation: {
                     layer1_rules:    { passed: true, issues: [] },
                     layer2_knowledge: { passed: true, issues: [] },
-                    layer3_online: {
-                        enabled: true,
-                        passed: true,
-                        match_status: 'strong_match',
-                        amap_address: '广东省深圳市南山区科技园路15号',
-                        suggested_zh_address: '广东省深圳市南山区科技园路15号',
-                        suggested_zh_confidence: 'high',
-                        suggested_zh_reason: '演示数据：联网校验通过',
-                        amap_calls: 0,
-                        queued_ms: 0,
-                        early_stop_hit: false,
-                        rate_limited_count: 0,
-                        cache_hits: 0,
-                    },
+                    layer3_online:   { enabled: false, match_status: 'disabled' },
                 },
                 scores: {
                     parse_score: 95, translation_score: 92,
                     format_score: 100, knowledge_score: 90,
-                    online_verify_score: 88, total_score: 93,
+                    online_verify_score: 0, total_score: 93,
                 },
                 model_used: 'demo-mock',
                 provider: 'fallback',
@@ -423,21 +617,11 @@
                 ? 'DEMO MODE — BACKEND OFFLINE'
                 : `VERIFIED VIA ${providerLabel} · ${safeModel}`;
 
-            // 2b. issues 汇总（parsed + layer3_online）
+            // 2b. 解析 issues（后端 parsed.issues）
             const pIssues = Array.isArray(parsed.issues) ? parsed.issues.filter(Boolean) : [];
-            const l3 = (validation && validation.layer3_online) ? validation.layer3_online : {};
-            const l3Issues = Array.isArray(l3.issues) ? l3.issues.filter(Boolean) : [];
-            const mergedIssues = [...pIssues, ...l3Issues];
-            const debugCandidates = Array.isArray(l3.debug_candidates) ? l3.debug_candidates : [];
-            if (debugCandidates.length > 0) {
-                const top = debugCandidates.slice(0, 2).map(c =>
-                    `候选(score=${c.score}, src=${c.source}, district=${c.district || '—'})`
-                );
-                mergedIssues.push(...top);
-            }
-            if (mergedIssues.length > 0) {
+            if (pIssues.length > 0) {
                 issuesSection.classList.remove('hidden');
-                issuesList.innerHTML = mergedIssues.map(i => `<li>${escapeHtml(String(i))}</li>`).join('');
+                issuesList.innerHTML = pIssues.map(i => `<li>${escapeHtml(String(i))}</li>`).join('');
             } else {
                 issuesSection.classList.add('hidden');
                 issuesList.innerHTML = '';
@@ -470,40 +654,6 @@
                 </div>`;
             }).join('');
 
-            // 3b. 中文参考（后端 suggested_zh_*）
-            const zhAddr = (l3.suggested_zh_address || '').trim();
-            currentZhReferenceText = zhAddr;
-            if (zhAddr) {
-                zhReferenceSection.classList.remove('hidden');
-                zhReferenceText.textContent = zhAddr;
-                const conf = (l3.suggested_zh_confidence || '').toLowerCase();
-                const reason = l3.suggested_zh_reason || '';
-                const src = l3.amap_pick_source || 'amap';
-                const tel = [
-                    `来源 ${src}`,
-                    typeof l3.amap_calls === 'number' ? `请求 ${l3.amap_calls} 次` : '',
-                    typeof l3.queued_ms === 'number' && l3.queued_ms > 0 ? `排队 ${l3.queued_ms}ms` : '',
-                    l3.early_stop_hit ? '早停' : '',
-                ].filter(Boolean).join(' · ');
-                zhReferenceMeta.textContent = [reason, tel].filter(Boolean).join(' — ');
-                const badgeMap = {
-                    high: { t: '高置信', cls: 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' },
-                    medium: { t: '中置信', cls: 'border-amber-500/40 text-amber-300 bg-amber-500/5' },
-                    low: { t: '低置信', cls: 'border-rose-500/40 text-rose-300 bg-rose-500/10' },
-                };
-                const b = badgeMap[conf] || badgeMap.medium;
-                zhRefBadge.textContent = b.t;
-                zhRefBadge.className = `text-[10px] font-mono uppercase px-2 py-0.5 rounded border ${b.cls}`;
-                zhRefBadge.classList.remove('hidden');
-                zhRefBadge.title = reason || '';
-            } else {
-                zhReferenceSection.classList.add('hidden');
-                zhReferenceText.textContent = '';
-                zhReferenceMeta.textContent = '';
-                zhRefBadge.classList.add('hidden');
-                zhRefBadge.textContent = '';
-            }
-
             // 4. 标准化输出地址（最后一行 CHINA 高亮显示）
             currentFormattedText = (data.formatted_text || formatted_address.join('\n'));
             if (formatted_address.length > 0) {
@@ -519,6 +669,7 @@
             // 5. 三层校验状态指示灯
             const l1 = validation.layer1_rules;
             const l2 = validation.layer2_knowledge;
+            const l3 = validation.layer3_online;
 
             // 工具：根据通过/失败返回指示灯颜色
             const dot = (passed) =>
@@ -529,9 +680,6 @@
                     partial_match: 'bg-yellow-500',
                     weak_match: 'bg-orange-500',
                     no_match: 'bg-red-500',
-                    ambiguous_match: 'bg-amber-500',
-                    mismatch: 'bg-rose-600',
-                    api_error: 'bg-yellow-600',
                 };
                 return `<div class="w-2 h-2 rounded-full ${colors[status] || 'bg-gray-700'}"></div>`;
             };
@@ -567,6 +715,253 @@
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;');
+        }
+
+        function truncateText(str, max = 72) {
+            const text = String(str || '');
+            return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+        }
+
+        function getBatchStatusDotClass(status) {
+            return {
+                success: 'bg-green-500',
+                failed: 'bg-red-500',
+                pending: 'bg-gray-700',
+                processing: 'bg-primary',
+            }[status] || 'bg-gray-700';
+        }
+
+        function scoreClass(score) {
+            if (score >= 90) return 'text-white';
+            if (score >= 70) return 'text-yellow-400';
+            return 'text-red-400';
+        }
+
+        function setBatchFile(file) {
+            batchSelectedFile = file || null;
+            if (!file) {
+                batchFileMeta.textContent = 'No file selected';
+                return;
+            }
+            batchFileMeta.textContent = `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
+        }
+
+        function resetBatchResults() {
+            batchRows = [];
+            batchTableBody.innerHTML = '';
+            batchProgressText.textContent = '0 / 0 Processed';
+            batchSummaryMini.textContent = 'Pending...';
+            batchFinalSummary.textContent = '0 Success · 0 Failed · Avg Score 0%';
+            batchProgressBar.style.width = '0%';
+            batchDownloadBtn.disabled = true;
+            batchEmptyState.classList.remove('hidden');
+            batchResultsState.classList.add('hidden');
+            batchStatusText.textContent = 'Awaiting Batch Input';
+            batchStatusText.className = 'text-xs text-gray-400 font-mono uppercase tracking-[0.2em]';
+        }
+
+        function ensureBatchRow(index, total) {
+            while (batchRows.length < total) {
+                const rowIndex = batchRows.length;
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-gray-900 align-top';
+                tr.innerHTML = `
+                    <td class="px-4 py-4 font-mono text-xs text-gray-500">${rowIndex + 1}</td>
+                    <td class="px-4 py-4 text-gray-300 max-w-[16rem] break-words">—</td>
+                    <td class="px-4 py-4 text-gray-500 max-w-[18rem] break-words">—</td>
+                    <td class="px-4 py-4 font-mono text-xs text-gray-500">—</td>
+                    <td class="px-4 py-4">
+                        <span class="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-gray-500">
+                            <span class="w-2 h-2 rounded-full bg-gray-700"></span>
+                            Pending
+                        </span>
+                    </td>
+                `;
+                batchRows.push({
+                    status: 'pending',
+                    raw_address: '',
+                    formatted_text: '',
+                    score: 0,
+                    error: '',
+                    element: tr,
+                });
+                batchTableBody.appendChild(tr);
+            }
+            return batchRows[index];
+        }
+
+        function updateBatchSummary(total) {
+            const processed = batchRows.filter(row => row.status === 'success' || row.status === 'failed').length;
+            const successCount = batchRows.filter(row => row.status === 'success').length;
+            const failedCount = batchRows.filter(row => row.status === 'failed').length;
+            const averageScore = successCount
+                ? (batchRows.filter(row => row.status === 'success').reduce((sum, row) => sum + Number(row.score || 0), 0) / successCount)
+                : 0;
+            const progress = total ? Math.round((processed / total) * 100) : 0;
+
+            batchProgressText.textContent = `${processed} / ${total} Processed`;
+            batchSummaryMini.textContent = `${successCount} Success · ${failedCount} Failed`;
+            batchFinalSummary.textContent = `${successCount} Success · ${failedCount} Failed · Avg Score ${averageScore.toFixed(1)}%`;
+            batchProgressBar.style.width = `${progress}%`;
+        }
+
+        function renderBatchItem(item) {
+            batchEmptyState.classList.add('hidden');
+            batchResultsState.classList.remove('hidden');
+            const row = ensureBatchRow(item.index, item.total);
+            row.status = item.status;
+            row.raw_address = item.raw_address || '';
+            row.formatted_text = item.formatted_text || '';
+            row.score = Number(item.score || 0);
+            row.error = item.error || '';
+
+            const cells = row.element.children;
+            cells[1].innerHTML = `
+                <div class="text-gray-200 leading-relaxed">${escapeHtml(truncateText(row.raw_address, 70))}</div>
+                <div class="text-[10px] text-gray-600 font-mono uppercase tracking-[0.2em] mt-2">${escapeHtml(item.status)}</div>
+            `;
+            cells[2].innerHTML = row.formatted_text
+                ? `<div class="text-blue-50 leading-relaxed">${escapeHtml(truncateText(row.formatted_text.replace(/\n/g, ' / '), 84))}</div>`
+                : `<div class="text-red-300 leading-relaxed">${escapeHtml(truncateText(row.error || 'No output', 84))}</div>`;
+            cells[3].innerHTML = row.status === 'success'
+                ? `<span class="font-mono text-xs ${scoreClass(row.score)}">${row.score.toFixed(1)}</span>`
+                : '<span class="font-mono text-xs text-red-400">0.0</span>';
+            cells[4].innerHTML = `
+                <span class="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] ${row.status === 'success' ? 'text-gray-300' : 'text-red-300'}">
+                    <span class="w-2 h-2 rounded-full ${getBatchStatusDotClass(row.status)}"></span>
+                    ${escapeHtml(row.status)}
+                </span>
+            `;
+
+            updateBatchSummary(item.total || batchRows.length);
+        }
+
+        function setBatchRunningState(isRunning) {
+            batchRunBtn.disabled = isRunning;
+            batchRunBtnText.textContent = isRunning ? 'Streaming...' : 'Run Batch';
+            batchCancelBtn.classList.toggle('hidden', !isRunning);
+            if (isRunning) {
+                batchStatusText.textContent = 'Batch Stream Live';
+                batchStatusText.className = 'text-xs text-primary font-mono uppercase tracking-[0.2em] animate-pulse';
+            }
+        }
+
+        function cancelBatchRun() {
+            if (batchAbortController) {
+                batchAbortController.abort();
+                batchAbortController = null;
+            }
+            setBatchRunningState(false);
+            batchStatusText.textContent = 'Batch Cancelled';
+            batchStatusText.className = 'text-xs text-yellow-500 font-mono uppercase tracking-[0.2em]';
+        }
+
+        function buildBatchCsv(rows) {
+            const headers = ['index', 'raw_address', 'formatted_text', 'score', 'status', 'error'];
+            const escapeCsvValue = (value) => {
+                const text = String(value == null ? '' : value);
+                return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+            };
+            const body = rows.map((row, index) => ([
+                index + 1,
+                row.raw_address || '',
+                row.formatted_text || '',
+                row.score || 0,
+                row.status || '',
+                row.error || '',
+            ].map(escapeCsvValue).join(',')));
+            return [headers.join(','), ...body].join('\r\n');
+        }
+
+        async function runBatchNormalize() {
+            const hasFile = batchSelectedFile;
+            const hasText = batchTextInput.value.trim();
+            if (batchSourceMode === 'upload' && !hasFile && !hasText) {
+                batchStatusText.textContent = 'Select A File Or Paste Text';
+                batchStatusText.className = 'text-xs text-red-500 font-mono uppercase tracking-[0.2em]';
+                return;
+            }
+            if (batchSourceMode === 'paste' && !hasText && !hasFile) {
+                batchStatusText.textContent = 'Paste Addresses First';
+                batchStatusText.className = 'text-xs text-red-500 font-mono uppercase tracking-[0.2em]';
+                return;
+            }
+
+            resetBatchResults();
+            setBatchRunningState(true);
+            batchAbortController = new AbortController();
+
+            const formData = new FormData();
+            if (hasFile) formData.append('file', batchSelectedFile);
+            if (hasText) formData.append('text', hasText);
+            formData.append('provider', batchSelectedProvider);
+            formData.append('use_online_verify', batchOnlineVerify.checked ? 'true' : 'false');
+            formData.append('address_column', batchAddressColumn.value.trim() || 'address');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/normalize/batch`, {
+                    method: 'POST',
+                    body: formData,
+                    signal: batchAbortController.signal,
+                });
+
+                if (!response.ok) {
+                    const errBody = await response.json().catch(() => ({}));
+                    throw new Error(errBody.detail || `HTTP ${response.status}`);
+                }
+                if (!response.body) {
+                    throw new Error('当前浏览器不支持流式读取，请使用 Chromium 内核浏览器');
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let buffer = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    lines.forEach(line => {
+                        if (!line.trim()) return;
+                        const payload = JSON.parse(line);
+                        if (payload.type === 'item') {
+                            renderBatchItem(payload);
+                        } else if (payload.type === 'done') {
+                            updateBatchSummary(payload.total || batchRows.length);
+                            batchSummaryMini.textContent = 'Batch Complete';
+                            batchDownloadBtn.disabled = false;
+                            batchStatusText.textContent = 'Batch Complete';
+                            batchStatusText.className = 'text-xs text-green-500 font-mono uppercase tracking-[0.2em]';
+                        } else if (payload.type === 'error') {
+                            batchStatusText.textContent = payload.message || 'Batch Error';
+                            batchStatusText.className = 'text-xs text-red-500 font-mono uppercase tracking-[0.2em]';
+                        }
+                    });
+                }
+
+                if (buffer.trim()) {
+                    const payload = JSON.parse(buffer);
+                    if (payload.type === 'item') renderBatchItem(payload);
+                    if (payload.type === 'done') {
+                        updateBatchSummary(payload.total || batchRows.length);
+                        batchDownloadBtn.disabled = false;
+                    }
+                }
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    batchStatusText.textContent = 'Batch Cancelled';
+                    batchStatusText.className = 'text-xs text-yellow-500 font-mono uppercase tracking-[0.2em]';
+                } else {
+                    batchStatusText.textContent = err.message || 'Batch Error';
+                    batchStatusText.className = 'text-xs text-red-500 font-mono uppercase tracking-[0.2em]';
+                }
+            } finally {
+                batchAbortController = null;
+                setBatchRunningState(false);
+            }
         }
 
         // ── 进入解析中状态 ──────────────────────────────────
@@ -605,29 +1000,6 @@
         }
 
         // ── 复制到剪贴板 ─────────────────────────────────────
-        copyZhBtn.addEventListener('click', async () => {
-            if (!currentZhReferenceText) return;
-            try {
-                await navigator.clipboard.writeText(currentZhReferenceText);
-                copyZhBtn.innerHTML = `<svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5" d="M5 13l4 4L19 7"></path></svg>`;
-                setTimeout(() => {
-                    copyZhBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5"
-                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>`;
-                }, 2000);
-            } catch {
-                copyZhBtn.title = '复制失败';
-            }
-        });
-
-        adoptZhBtn.addEventListener('click', () => {
-            if (!currentZhReferenceText) return;
-            input.value = currentZhReferenceText;
-            borderFocus.classList.remove('-translate-x-full');
-            parseBtn.click();
-        });
-
         copyBtn.addEventListener('click', async () => {
             if (!currentFormattedText) return;
             try {
@@ -688,6 +1060,43 @@
                 parseBtn.click();
             }
         });
+
+        batchFileInput.addEventListener('change', () => {
+            setBatchFile(batchFileInput.files && batchFileInput.files[0]);
+        });
+
+        ['dragenter', 'dragover'].forEach(evt => {
+            batchDropzone.addEventListener(evt, (e) => {
+                e.preventDefault();
+                batchDropzone.classList.add('border-primary');
+            });
+        });
+        ['dragleave', 'drop'].forEach(evt => {
+            batchDropzone.addEventListener(evt, (e) => {
+                e.preventDefault();
+                batchDropzone.classList.remove('border-primary');
+            });
+        });
+        batchDropzone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer && e.dataTransfer.files;
+            if (!files || !files.length) return;
+            setBatchFile(files[0]);
+        });
+
+        batchRunBtn.addEventListener('click', runBatchNormalize);
+        batchCancelBtn.addEventListener('click', cancelBatchRun);
+        batchDownloadBtn.addEventListener('click', () => {
+            const csv = buildBatchCsv(batchRows);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'batch-address-results.csv';
+            link.click();
+            URL.revokeObjectURL(url);
+        });
+
+        resetBatchResults();
     </script>
 </body>
 </html>

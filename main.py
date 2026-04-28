@@ -12,15 +12,16 @@
 # ============================================================
 
 import os
+import json
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
 
 # 在最早期加载 .env，确保所有模块初始化前环境变量已就绪
@@ -30,6 +31,7 @@ load_dotenv(dotenv_path=_env_path, override=True)
 
 # 在环境变量加载后再引入依赖模块（避免 env 读取时序问题）
 from modules.address_processor import normalize_address, get_llm_adapter
+from modules.batch_parser import parse_batch_input
 
 # ── 日志配置 ───────────────────────────────────────────────
 logging.basicConfig(
@@ -37,6 +39,24 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("main")
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)).strip() or default)
+    except ValueError:
+        return default
+
+
+def _normalize_provider(provider: str | None) -> str:
+    key = (provider or "deepseek").lower().strip()
+    if key not in ("claude", "deepseek"):
+        raise ValueError('provider 必须是 "claude" 或 "deepseek"')
+    return key
+
+
+def _ndjson_line(payload: dict) -> bytes:
+    return (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8")
 
 
 # ── 应用生命周期：启动时预热 LLM Adapter ──────────────────
@@ -113,6 +133,137 @@ class NormalizeResponse(BaseModel):
     processing_time_ms: int
 
 
+async def _build_batch_addresses(
+    file: UploadFile | None,
+    text: str | None,
+    address_column: str,
+) -> list[str]:
+    file_bytes = await file.read() if file else None
+    file_name = file.filename if file else None
+    max_items = _env_int("BATCH_MAX_ITEMS", 500)
+    return parse_batch_input(
+        file_name=file_name,
+        file_bytes=file_bytes,
+        text=text,
+        address_column=address_column,
+        max_items=max_items,
+    )
+
+
+async def _process_single_batch_item(index: int, total: int, raw_address: str, use_online_verify: bool, provider: str) -> dict:
+    try:
+        result = await normalize_address(
+            raw_address=raw_address,
+            use_online_verify=use_online_verify,
+            provider=provider,
+        )
+        return {
+            "type": "item",
+            "index": index,
+            "total": total,
+            "raw_address": raw_address,
+            "formatted_text": result.get("formatted_text", ""),
+            "score": float(result.get("scores", {}).get("total_score", 0) or 0),
+            "status": "success",
+            "error": None,
+            "processing_time_ms": int(result.get("processing_time_ms", 0) or 0),
+        }
+    except RuntimeError as exc:
+        logger.warning("批量单条处理失败(index=%s): %s", index, exc)
+        return {
+            "type": "item",
+            "index": index,
+            "total": total,
+            "raw_address": raw_address,
+            "formatted_text": "",
+            "score": 0,
+            "status": "failed",
+            "error": str(exc),
+            "processing_time_ms": 0,
+        }
+    except Exception as exc:
+        logger.exception("批量单条处理出现未知错误(index=%s): %s", index, exc)
+        return {
+            "type": "item",
+            "index": index,
+            "total": total,
+            "raw_address": raw_address,
+            "formatted_text": "",
+            "score": 0,
+            "status": "failed",
+            "error": "服务器处理异常，请稍后重试",
+            "processing_time_ms": 0,
+        }
+
+
+async def _stream_batch_results(request: Request, addresses: list[str], use_online_verify: bool, provider: str):
+    total = len(addresses)
+    concurrency = max(1, _env_int("BATCH_CONCURRENCY", 3))
+    work_queue: asyncio.Queue = asyncio.Queue()
+    result_queue: asyncio.Queue = asyncio.Queue()
+    workers: list[asyncio.Task] = []
+
+    for item in enumerate(addresses):
+        await work_queue.put(item)
+
+    async def worker() -> None:
+        while True:
+            try:
+                index, raw_address = await work_queue.get()
+            except asyncio.CancelledError:
+                return
+            try:
+                payload = await _process_single_batch_item(index, total, raw_address, use_online_verify, provider)
+                await result_queue.put(payload)
+            finally:
+                work_queue.task_done()
+
+    worker_count = min(concurrency, total)
+    for _ in range(worker_count):
+        workers.append(asyncio.create_task(worker()))
+
+    completed = 0
+    success_count = 0
+    failed_count = 0
+    score_sum = 0.0
+
+    try:
+        while completed < total:
+            if await request.is_disconnected():
+                raise asyncio.CancelledError()
+            payload = await result_queue.get()
+            completed += 1
+            if payload["status"] == "success":
+                success_count += 1
+                score_sum += float(payload["score"])
+            else:
+                failed_count += 1
+            yield _ndjson_line(payload)
+
+        average_score = round(score_sum / success_count, 1) if success_count else 0.0
+        yield _ndjson_line({
+            "type": "done",
+            "total": total,
+            "success_count": success_count,
+            "failed_count": failed_count,
+            "average_score": average_score,
+        })
+    except asyncio.CancelledError:
+        logger.info("批量任务已取消或客户端断开")
+    except Exception as exc:
+        logger.exception("批量流式输出失败: %s", exc)
+        yield _ndjson_line({
+            "type": "error",
+            "message": "批量任务已取消或服务端处理异常",
+            "retryable": False,
+        })
+    finally:
+        for task in workers:
+            task.cancel()
+        if workers:
+            await asyncio.gather(*workers, return_exceptions=True)
+
+
 # ── 路由定义 ──────────────────────────────────────────────
 
 @app.get("/", include_in_schema=False)
@@ -155,6 +306,35 @@ async def api_normalize(req: NormalizeRequest):
         # 未预期错误，返回 500
         logger.exception("未知错误：%s", exc)
         raise HTTPException(status_code=500, detail=f"服务器内部错误：{exc}")
+
+
+@app.post("/api/normalize/batch")
+async def api_normalize_batch(
+    request: Request,
+    file: UploadFile | None = File(default=None),
+    text: str | None = Form(default=None),
+    use_online_verify: bool = Form(default=False),
+    provider: str = Form(default="deepseek"),
+    address_column: str = Form(default="address"),
+):
+    try:
+        normalized_provider = _normalize_provider(provider)
+        addresses = await _build_batch_addresses(file, text, address_column)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.exception("批量请求预检失败：%s", exc)
+        raise HTTPException(status_code=500, detail="批量输入解析失败")
+
+    headers = {
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+    }
+    return StreamingResponse(
+        _stream_batch_results(request, addresses, use_online_verify, normalized_provider),
+        media_type="application/x-ndjson; charset=utf-8",
+        headers=headers,
+    )
 
 
 @app.get("/api/health")
