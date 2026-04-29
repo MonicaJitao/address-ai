@@ -53,22 +53,22 @@
         .hide-scroll::-webkit-scrollbar { display: none; }
     </style>
 </head>
-<body class="bg-bglight text-gray-900 font-sans min-h-screen w-screen lg:h-screen lg:overflow-hidden flex items-center justify-center p-4 lg:p-12">
+<body class="bg-bglight text-gray-900 font-sans min-h-screen w-screen flex items-start justify-center p-2 lg:p-5">
 
     <!-- 主容器：模式切换 + 内容区 -->
-    <main class="w-full max-w-7xl h-auto lg:h-full bg-surface shadow-2xl overflow-hidden rounded-xl lg:rounded-none border border-gray-100 flex flex-col">
+    <main class="w-full max-w-7xl h-auto bg-surface shadow-2xl overflow-visible rounded-xl lg:rounded-none border border-gray-100 flex flex-col">
         <div class="px-6 lg:px-10 py-5 border-b border-gray-100 bg-white/95 backdrop-blur">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    <p class="text-primary font-bold tracking-widest text-[10px] uppercase mb-2">WB · AI Tools</p>
-                    <p class="text-gray-400 text-xs font-mono uppercase tracking-[0.25em]">Operating Mode</p>
+                    <p class="text-primary font-bold tracking-widest text-[10px] uppercase mb-2">WB · AI 工具</p>
+                    <p class="text-gray-400 text-xs font-mono uppercase tracking-[0.25em]">处理模式</p>
                 </div>
                 <div class="inline-flex border border-gray-200 overflow-hidden shadow-sm">
                     <button id="singleModeBtn" type="button" class="mode-tab-btn px-5 py-3 text-xs font-mono uppercase tracking-[0.25em] transition-colors bg-primary text-white">
-                        Single
+                        单条
                     </button>
                     <button id="batchModeBtn" type="button" class="mode-tab-btn px-5 py-3 text-xs font-mono uppercase tracking-[0.25em] transition-colors text-gray-600 border-l border-gray-200 hover:bg-gray-50">
-                        Batch
+                        批量
                     </button>
                 </div>
             </div>
@@ -79,12 +79,12 @@
         <section class="w-full lg:w-5/12 h-auto lg:h-full flex flex-col relative z-10 p-6 lg:p-16">
             <!-- 品牌标识 -->
             <div class="mb-6 lg:mb-auto">
-                <p class="text-primary font-bold tracking-widest text-xs uppercase mb-4">WB · AI Tools</p>
+                <!-- <p class="text-primary font-bold tracking-widest text-xs uppercase mb-4">WB · AI 工具</p> -->
                 <h1 class="font-serif text-4xl lg:text-5xl leading-tight mb-2 text-gray-900">
-                    Address<br><span class="italic text-gray-500">Intelligence.</span>
+                    地址<br><span class="italic text-gray-500">AI标准化</span>
                 </h1>
                 <p class="text-gray-500 text-sm max-w-xs mt-6 leading-relaxed">
-                    粘贴任意中文地址，AI 自动解析并输出符合国际 KYC 标准的英文格式。
+                    粘贴任意地址（可包括中文，英文，拼音），AI 自动解析并输出符合国际 KYC 标准的英文格式。
                 </p>
             </div>
 
@@ -105,7 +105,7 @@
             <!-- 底部：模型选择 + 操作栏 -->
             <div class="mt-6 lg:mt-auto flex flex-col gap-6">
                 <div class="flex flex-wrap items-center gap-3">
-                    <span class="text-[10px] text-gray-400 font-mono uppercase tracking-widest">Provider</span>
+                    <span class="text-[10px] text-gray-400 font-mono uppercase tracking-widest">服务商</span>
                     <div class="inline-flex rounded border border-gray-200 overflow-hidden shadow-sm">
                         <button type="button" data-provider="deepseek"
                             class="provider-btn px-4 py-2 text-xs font-mono uppercase transition-colors">
@@ -120,14 +120,14 @@
                 <div class="flex justify-between items-center">
                 <button id="parseBtn"
                     class="bg-primary text-white px-8 py-4 font-semibold tracking-wide text-sm hover:bg-blue-700 transition-colors uppercase flex items-center gap-3 group">
-                    <span id="parseBtnText">Initiate Parse</span>
+                    <span id="parseBtnText">开始解析</span>
                     <svg id="parseBtnIcon" class="w-4 h-4 transform group-hover:translate-x-1 transition-transform"
                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2"
                             d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                     </svg>
                 </button>
-                <div id="statusText" class="text-xs text-gray-400 font-mono">AWAITING INPUT</div>
+                <div id="statusText" class="text-xs text-gray-400 font-mono">等待输入</div>
                 </div>
             </div>
         </section>
@@ -142,7 +142,7 @@
                         d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z">
                     </path>
                 </svg>
-                <p class="font-mono text-gray-600 text-sm tracking-widest uppercase">System Standby</p>
+                <p class="font-mono text-gray-600 text-sm tracking-widest uppercase">系统待命</p>
             </div>
 
             <!-- 错误状态（API 调用失败时显示） -->
@@ -152,7 +152,7 @@
                         d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
                     </path>
                 </svg>
-                <p class="font-mono text-red-500 text-sm tracking-widest uppercase mb-3">API ERROR</p>
+                <p class="font-mono text-red-500 text-sm tracking-widest uppercase mb-3">接口错误</p>
                 <p id="errorMessage" class="text-gray-500 text-xs text-center leading-relaxed max-w-xs"></p>
                 <p class="text-gray-700 text-[10px] mt-4 font-mono">
                     请检查 .env 配置后重启服务：python main.py
@@ -191,7 +191,7 @@
                         class="grid grid-cols-2 lg:grid-cols-3 gap-px bg-gray-800/50 border border-gray-800/50">
                     </div>
                     <div id="issuesSection" class="hidden mt-4 p-3 border border-yellow-500/20 bg-yellow-500/5 rounded-sm">
-                        <p class="text-yellow-400 text-xs font-mono uppercase mb-2">Parse Issues</p>
+                        <p class="text-yellow-400 text-xs font-mono uppercase mb-2">解析问题</p>
                         <ul id="issuesList" class="text-yellow-300 text-xs font-mono space-y-1 list-disc list-inside"></ul>
                     </div>
                 </div>
@@ -231,13 +231,13 @@
         </section>
         </div>
 
-        <section id="batchView" class="hidden flex-1 bg-darkvault text-white noise-bg">
-            <div class="w-full h-full flex flex-col lg:flex-row">
-                <section class="w-full lg:w-5/12 bg-surface text-gray-900 p-6 lg:p-12 border-r border-gray-100 flex flex-col">
-                    <div class="mb-8">
-                        <p class="text-primary font-bold tracking-widest text-xs uppercase mb-3">Batch Processing</p>
+        <section id="batchView" class="hidden bg-darkvault text-white noise-bg">
+            <div class="w-full flex flex-col lg:flex-row">
+                <section class="w-full lg:w-5/12 bg-surface text-gray-900 p-6 lg:p-8 border-r border-gray-100 flex flex-col lg:h-full lg:min-h-0 lg:overflow-y-auto hide-scroll">
+                    <div class="mb-5">
+                        <p class="text-primary font-bold tracking-widest text-xs uppercase mb-3">批量处理</p>
                         <h2 class="font-serif text-3xl lg:text-4xl leading-tight text-gray-900">
-                            Address<br><span class="italic text-gray-500">Convoy.</span>
+                            地址<br><span class="italic text-gray-500">编队处理。</span>
                         </h2>
                         <p class="text-gray-500 text-sm mt-5 leading-relaxed max-w-md">
                             上传 CSV / Excel，或直接粘贴多行地址。系统将按完成顺序返回结果，并按原始序号回填。
@@ -246,32 +246,49 @@
 
                     <div class="inline-flex border border-gray-200 overflow-hidden shadow-sm mb-6 self-start">
                         <button id="batchSourceUploadBtn" type="button" class="batch-source-btn px-4 py-2 text-xs font-mono uppercase bg-primary text-white">
-                            Upload File
+                            上传文件
                         </button>
                         <button id="batchSourcePasteBtn" type="button" class="batch-source-btn px-4 py-2 text-xs font-mono uppercase text-gray-600 border-l border-gray-200 hover:bg-gray-50">
-                            Paste Text
+                            粘贴文本
                         </button>
                     </div>
 
                     <div id="batchUploadPanel" class="space-y-4">
                         <input id="batchFileInput" type="file" accept=".csv,.xlsx" class="hidden">
                         <button id="batchDropzone" type="button" class="w-full border border-dashed border-gray-300 hover:border-primary transition-colors p-6 text-left group">
-                            <p class="text-xs font-mono uppercase tracking-[0.25em] text-gray-400 mb-3">File Intake</p>
-                            <p class="font-serif text-2xl text-gray-800 leading-snug">Drop a `.csv` or `.xlsx` here, or click to select.</p>
-                            <p id="batchFileMeta" class="mt-4 text-xs font-mono uppercase tracking-[0.2em] text-gray-400">No file selected</p>
+                            <p class="text-xs font-mono uppercase tracking-[0.25em] text-gray-400 mb-3">文件导入</p>
+                            <p class="font-serif text-2xl text-gray-800 leading-snug">将 `.csv` 或 `.xlsx` 拖到这里，或点击选择文件。</p>
+                            <p id="batchFileMeta" class="mt-4 text-xs font-mono uppercase tracking-[0.2em] text-gray-400">未选择文件</p>
                         </button>
                         <p class="text-[11px] text-gray-400 leading-relaxed">
                             本版本支持 `.csv` 与 `.xlsx`。若地址列不是 `address`，可在下方手动指定列名。
                         </p>
+                        <button id="batchParseBtn" type="button" class="hidden w-full border border-primary text-primary px-6 py-3 text-xs font-mono uppercase tracking-[0.25em] hover:bg-primary hover:text-white transition-colors flex items-center justify-center gap-2">
+                            <span id="batchParseBtnText">解析文件</span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                            </svg>
+                        </button>
+                        <div id="batchPreviewPanel" class="hidden space-y-2">
+                            <div class="flex items-center justify-between gap-3">
+                                <p class="text-[10px] text-gray-400 font-mono uppercase tracking-[0.25em]">
+                                    已解析地址 · <span id="batchPreviewCount">0</span> 行
+                                </p>
+                                <button id="batchPreviewClearBtn" type="button" class="text-[10px] text-gray-400 font-mono uppercase hover:text-red-400 transition-colors">
+                                    清空
+                                </button>
+                            </div>
+                            <textarea id="batchPreviewTextarea" rows="8" class="w-full text-sm leading-relaxed bg-transparent border border-gray-200 outline-none resize-none p-3 hide-scroll placeholder-gray-300 font-mono text-gray-800 focus:border-primary transition-colors" placeholder="每行一条地址，可直接编辑"></textarea>
+                        </div>
                     </div>
 
                     <div id="batchTextPanel" class="hidden">
                         <textarea id="batchTextInput" rows="10" class="w-full text-left text-lg leading-relaxed bg-transparent border border-gray-200 outline-none resize-none p-4 hide-scroll placeholder-gray-300 font-serif text-gray-800 focus:border-primary transition-colors" placeholder="每行一条地址&#10;例如：&#10;深圳市南山区科技园南区1号&#10;北京市朝阳区建国路88号"></textarea>
                     </div>
 
-                    <div class="mt-6 pt-6 border-t border-gray-100 space-y-5">
+                    <div class="mt-4 pt-4 border-t border-gray-100 space-y-4">
                         <div class="flex flex-wrap items-center gap-3">
-                            <span class="text-[10px] text-gray-400 font-mono uppercase tracking-widest">Provider</span>
+                            <span class="text-[10px] text-gray-400 font-mono uppercase tracking-widest">服务商</span>
                             <div class="inline-flex rounded border border-gray-200 overflow-hidden shadow-sm">
                                 <button type="button" data-batch-provider="deepseek" class="batch-provider-btn px-4 py-2 text-xs font-mono uppercase transition-colors">
                                     DeepSeek
@@ -284,26 +301,26 @@
 
                         <label class="flex items-center justify-between gap-4 border border-gray-200 px-4 py-3">
                             <div>
-                                <p class="text-[10px] text-gray-400 font-mono uppercase tracking-[0.25em]">Online Verify</p>
+                                <p class="text-[10px] text-gray-400 font-mono uppercase tracking-[0.25em]">在线校验</p>
                                 <p class="text-xs text-gray-500 mt-1">默认关闭，避免高德限流放大批量耗时。</p>
                             </div>
                             <input id="batchOnlineVerify" type="checkbox" class="h-4 w-4 accent-primary">
                         </label>
 
-                        <label class="block">
-                            <span class="text-[10px] text-gray-400 font-mono uppercase tracking-[0.25em]">Address Column</span>
+                        <label id="batchAddressColumnWrapper" class="block">
+                            <span class="text-[10px] text-gray-400 font-mono uppercase tracking-[0.25em]">地址列名</span>
                             <input id="batchAddressColumn" type="text" value="address" class="mt-2 w-full border border-gray-200 px-4 py-3 text-sm text-gray-800 outline-none focus:border-primary transition-colors font-mono">
                         </label>
                     </div>
 
-                    <div class="mt-auto pt-8 flex flex-wrap items-center justify-between gap-4">
-                        <div id="batchStatusText" class="text-xs text-gray-400 font-mono uppercase tracking-[0.2em]">Awaiting Batch Input</div>
+                    <div class="mt-auto pt-4 flex flex-wrap items-center justify-between gap-4">
+                        <div id="batchStatusText" class="text-xs text-gray-400 font-mono uppercase tracking-[0.2em]">等待批量输入</div>
                         <div class="flex items-center gap-3">
                             <button id="batchCancelBtn" type="button" class="hidden border border-gray-300 text-gray-600 px-5 py-3 text-xs font-mono uppercase tracking-[0.2em] hover:border-gray-500 transition-colors">
-                                Cancel
+                                取消
                             </button>
                             <button id="batchRunBtn" type="button" class="bg-primary text-white px-8 py-4 font-semibold tracking-wide text-sm hover:bg-blue-700 transition-colors uppercase flex items-center gap-3 group">
-                                <span id="batchRunBtnText">Run Batch</span>
+                                <span id="batchRunBtnText">开始批量处理</span>
                                 <svg class="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                                 </svg>
@@ -312,24 +329,24 @@
                     </div>
                 </section>
 
-                <section class="w-full lg:w-7/12 min-h-[60vh] p-6 lg:p-12 flex flex-col overflow-hidden">
+                <section class="w-full lg:w-7/12 min-h-[60vh] lg:h-full lg:min-h-0 p-6 lg:p-8 flex flex-col overflow-hidden">
                     <div id="batchEmptyState" class="flex-1 flex items-center justify-center flex-col text-center">
                         <svg class="w-16 h-16 text-gray-800 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1" d="M4 7h16M4 12h16M4 17h10M7 4v16m10-7l2 2 4-4"></path>
                         </svg>
-                        <p class="font-mono text-gray-600 text-sm tracking-widest uppercase">Batch Standby</p>
+                        <p class="font-mono text-gray-600 text-sm tracking-widest uppercase">批量任务待命</p>
                     </div>
 
-                    <div id="batchResultsState" class="hidden h-full flex flex-col">
+                    <div id="batchResultsState" class="hidden h-full min-h-0 flex flex-col">
                         <header class="border-b border-gray-800 pb-6 mb-6">
                             <div class="flex flex-wrap items-end justify-between gap-4">
                                 <div>
-                                    <p class="text-xs text-primary font-mono tracking-[0.25em] uppercase mb-2">Batch Telemetry</p>
-                                    <h3 class="font-serif text-3xl text-white">Processing Ledger</h3>
+                                    <p class="text-xs text-primary font-mono tracking-[0.25em] uppercase mb-2">批量运行看板</p>
+                                    <h3 class="font-serif text-3xl text-white">处理记录</h3>
                                 </div>
                                 <div class="text-right">
-                                    <p id="batchProgressText" class="text-sm font-mono uppercase tracking-[0.2em] text-gray-400">0 / 0 Processed</p>
-                                    <p id="batchSummaryMini" class="text-[10px] font-mono uppercase tracking-[0.2em] text-gray-600 mt-2">Pending...</p>
+                                    <p id="batchProgressText" class="text-sm font-mono uppercase tracking-[0.2em] text-gray-400">0 / 0 已处理</p>
+                                    <p id="batchSummaryMini" class="text-[10px] font-mono uppercase tracking-[0.2em] text-gray-600 mt-2">等待中...</p>
                                 </div>
                             </div>
                             <div class="mt-5 h-1 w-full bg-gray-900 overflow-hidden">
@@ -342,10 +359,10 @@
                                 <thead class="sticky top-0 bg-darkvault/95 backdrop-blur">
                                     <tr class="border-b border-gray-800 text-[10px] font-mono uppercase tracking-[0.2em] text-gray-500">
                                         <th class="text-left px-4 py-3 w-16">#</th>
-                                        <th class="text-left px-4 py-3">Raw Address</th>
-                                        <th class="text-left px-4 py-3">Standardized Output</th>
-                                        <th class="text-left px-4 py-3 w-24">Score</th>
-                                        <th class="text-left px-4 py-3 w-28">Status</th>
+                                        <th class="text-left px-4 py-3">原始地址</th>
+                                        <th class="text-left px-4 py-3">标准化结果</th>
+                                        <th class="text-left px-4 py-3 w-24">得分</th>
+                                        <th class="text-left px-4 py-3 w-28">状态</th>
                                     </tr>
                                 </thead>
                                 <tbody id="batchTableBody"></tbody>
@@ -354,10 +371,10 @@
 
                         <footer class="pt-6 mt-6 border-t border-gray-800 flex flex-wrap items-center justify-between gap-4">
                             <div id="batchFinalSummary" class="text-xs font-mono uppercase tracking-[0.2em] text-gray-400">
-                                0 Success · 0 Failed · Avg Score 0%
+                                0 成功 · 0 失败 · 平均分 0%
                             </div>
                             <button id="batchDownloadBtn" type="button" class="border border-primary/30 text-primary px-5 py-3 text-xs font-mono uppercase tracking-[0.2em] hover:bg-primary hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed" disabled>
-                                Download CSV
+                                下载 CSV
                             </button>
                         </footer>
                     </div>
@@ -410,10 +427,17 @@
         const batchFileInput = document.getElementById('batchFileInput');
         const batchDropzone = document.getElementById('batchDropzone');
         const batchFileMeta = document.getElementById('batchFileMeta');
+        const batchParseBtn = document.getElementById('batchParseBtn');
+        const batchParseBtnText = document.getElementById('batchParseBtnText');
+        const batchPreviewPanel = document.getElementById('batchPreviewPanel');
+        const batchPreviewCount = document.getElementById('batchPreviewCount');
+        const batchPreviewClearBtn = document.getElementById('batchPreviewClearBtn');
+        const batchPreviewTextarea = document.getElementById('batchPreviewTextarea');
         const batchTextInput = document.getElementById('batchTextInput');
         const batchProviderBtns = document.querySelectorAll('.batch-provider-btn');
         const batchOnlineVerify = document.getElementById('batchOnlineVerify');
         const batchAddressColumn = document.getElementById('batchAddressColumn');
+        const batchAddressColumnWrapper = document.getElementById('batchAddressColumnWrapper');
         const batchStatusText = document.getElementById('batchStatusText');
         const batchCancelBtn = document.getElementById('batchCancelBtn');
         const batchRunBtn = document.getElementById('batchRunBtn');
@@ -436,6 +460,7 @@
         let batchSelectedFile = null;
         let batchAbortController = null;
         let batchRows = [];
+        let batchFileParseState = 'idle';
 
         function setMode(mode) {
             activeMode = mode;
@@ -463,6 +488,13 @@
             const uploadOn = mode === 'upload';
             batchUploadPanel.classList.toggle('hidden', !uploadOn);
             batchTextPanel.classList.toggle('hidden', uploadOn);
+            batchAddressColumnWrapper.classList.toggle('hidden', !uploadOn);
+            batchParseBtn.classList.toggle('hidden', !uploadOn || !batchSelectedFile);
+            if (!uploadOn) {
+                batchPreviewPanel.classList.add('hidden');
+            } else if (batchFileParseState === 'parsed') {
+                batchPreviewPanel.classList.remove('hidden');
+            }
 
             batchSourceUploadBtn.classList.toggle('bg-primary', uploadOn);
             batchSourceUploadBtn.classList.toggle('text-white', uploadOn);
@@ -609,13 +641,13 @@
 
             // 2. 模型供应商标识
             const providerLabel = {
-                claude: 'Claude Proxy',
+                claude: 'Claude 代理',
                 deepseek: 'DeepSeek-V3',
-                fallback: 'DEMO MODE',
+                fallback: '演示模式',
             }[provider] || provider.toUpperCase();
             modelInfo.textContent = data.is_mock
-                ? 'DEMO MODE — BACKEND OFFLINE'
-                : `VERIFIED VIA ${providerLabel} · ${safeModel}`;
+                ? '演示模式 - 后端离线'
+                : `已通过 ${providerLabel} 验证 · ${safeModel}`;
 
             // 2b. 解析 issues（后端 parsed.issues）
             const pIssues = Array.isArray(parsed.issues) ? parsed.issues.filter(Boolean) : [];
@@ -629,19 +661,19 @@
 
             // 3. 结构化字段网格
             const fields = [
-                { label: 'Country',       value: parsed.country || 'China' },
-                { label: 'Province',      value: parsed.province || '' },
-                { label: 'City',          value: parsed.city || '' },
-                { label: 'District',      value: parsed.district
+                { label: '国家',       value: parsed.country || 'China' },
+                { label: '省份',      value: parsed.province || '' },
+                { label: '城市',          value: parsed.city || '' },
+                { label: '区县',      value: parsed.district
                     ? (parsed.district.toLowerCase().includes('district')
                         ? parsed.district
                         : `${parsed.district} District`)
                     : '' },
-                { label: 'Street / Road', value: [
+                { label: '街道 / 路名', value: [
                     parsed.number ? `No. ${parsed.number}` : '',
                     parsed.street || ''
                 ].filter(Boolean).join(' ') },
-                { label: 'POI / Building', value: parsed.building || '' },
+                { label: '地标 / 楼栋', value: parsed.building || '' },
             ];
             entityGrid.innerHTML = fields.map(f => {
                 const hasVal = Boolean(f.value);
@@ -686,24 +718,24 @@
 
             layer1Status.innerHTML = `${dot(l1.passed)}
                 <span class="text-[10px] font-mono text-gray-400 uppercase tracking-wider">
-                    Rules: ${l1.passed ? 'Pass' : 'Warning'}
+                    规则校验: ${l1.passed ? '通过' : '警告'}
                 </span>`;
 
             layer2Status.innerHTML = `${dot(l2.passed)}
                 <span class="text-[10px] font-mono text-gray-400 uppercase tracking-wider">
-                    Knowledge: ${l2.passed ? 'Pass' : 'Warning'}
+                    知识校验: ${l2.passed ? '通过' : '警告'}
                 </span>`;
 
             if (l3.enabled) {
                 const statusLabel = (l3.match_status || 'n/a').replace(/_/g, ' ').toUpperCase();
                 layer3Status.innerHTML = `${dot3(l3.match_status)}
                     <span class="text-[10px] font-mono text-gray-400 uppercase tracking-wider">
-                        Geocode: ${statusLabel}
+                        地理编码: ${statusLabel}
                     </span>`;
             } else {
                 layer3Status.innerHTML = `<div class="w-2 h-2 rounded-full bg-gray-700"></div>
                     <span class="text-[10px] font-mono text-gray-600 uppercase tracking-wider">
-                        Geocode: Disabled
+                        地理编码: 已关闭
                     </span>`;
             }
         }
@@ -737,26 +769,107 @@
             return 'text-red-400';
         }
 
+        function statusTextZh(status) {
+            return {
+                success: '成功',
+                failed: '失败',
+                pending: '等待中',
+                processing: '处理中',
+            }[status] || String(status || '');
+        }
+
+        function getEditedPreviewText() {
+            return batchPreviewTextarea.value
+                .split(/\r?\n/)
+                .map(line => line.trim())
+                .filter(Boolean)
+                .join('\n');
+        }
+
+        function updateBatchPreviewCount() {
+            const text = getEditedPreviewText();
+            const count = text ? text.split('\n').length : 0;
+            batchPreviewCount.textContent = String(count);
+            return count;
+        }
+
+        function showBatchPreview(addresses) {
+            batchPreviewTextarea.value = (addresses || []).join('\n');
+            batchPreviewPanel.classList.remove('hidden');
+            batchFileParseState = 'parsed';
+            updateBatchPreviewCount();
+            batchStatusText.textContent = '文件解析完成';
+            batchStatusText.className = 'text-xs text-green-500 font-mono uppercase tracking-[0.2em]';
+        }
+
+        function clearBatchPreview() {
+            batchPreviewTextarea.value = '';
+            batchPreviewPanel.classList.add('hidden');
+            batchPreviewCount.textContent = '0';
+            batchFileParseState = batchSelectedFile ? 'file_selected' : 'idle';
+        }
+
+        async function parseBatchFile() {
+            if (!batchSelectedFile) {
+                batchStatusText.textContent = '请先选择文件';
+                batchStatusText.className = 'text-xs text-red-500 font-mono uppercase tracking-[0.2em]';
+                return;
+            }
+
+            batchParseBtn.disabled = true;
+            batchParseBtnText.textContent = '解析中...';
+            batchStatusText.textContent = '正在解析文件';
+            batchStatusText.className = 'text-xs text-primary font-mono uppercase tracking-[0.2em] animate-pulse';
+
+            const formData = new FormData();
+            formData.append('file', batchSelectedFile);
+            formData.append('address_column', batchAddressColumn.value.trim() || 'address');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/normalize/batch/preview`, {
+                    method: 'POST',
+                    body: formData,
+                });
+                if (!response.ok) {
+                    const errBody = await response.json().catch(() => ({}));
+                    throw new Error(errBody.detail || `HTTP ${response.status}`);
+                }
+                const payload = await response.json();
+                showBatchPreview(payload.addresses || []);
+            } catch (err) {
+                batchStatusText.textContent = err.message || '解析失败';
+                batchStatusText.className = 'text-xs text-red-500 font-mono uppercase tracking-[0.2em]';
+            } finally {
+                batchParseBtn.disabled = false;
+                batchParseBtnText.textContent = '解析文件';
+            }
+        }
+
         function setBatchFile(file) {
             batchSelectedFile = file || null;
             if (!file) {
-                batchFileMeta.textContent = 'No file selected';
+                batchFileMeta.textContent = '未选择文件';
+                batchParseBtn.classList.add('hidden');
+                clearBatchPreview();
                 return;
             }
             batchFileMeta.textContent = `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
+            batchFileParseState = 'file_selected';
+            batchParseBtn.classList.remove('hidden');
+            clearBatchPreview();
         }
 
         function resetBatchResults() {
             batchRows = [];
             batchTableBody.innerHTML = '';
-            batchProgressText.textContent = '0 / 0 Processed';
-            batchSummaryMini.textContent = 'Pending...';
-            batchFinalSummary.textContent = '0 Success · 0 Failed · Avg Score 0%';
+            batchProgressText.textContent = '0 / 0 已处理';
+            batchSummaryMini.textContent = '等待中...';
+            batchFinalSummary.textContent = '0 成功 · 0 失败 · 平均分 0%';
             batchProgressBar.style.width = '0%';
             batchDownloadBtn.disabled = true;
             batchEmptyState.classList.remove('hidden');
             batchResultsState.classList.add('hidden');
-            batchStatusText.textContent = 'Awaiting Batch Input';
+            batchStatusText.textContent = '等待批量输入';
             batchStatusText.className = 'text-xs text-gray-400 font-mono uppercase tracking-[0.2em]';
         }
 
@@ -773,7 +886,7 @@
                     <td class="px-4 py-4">
                         <span class="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-gray-500">
                             <span class="w-2 h-2 rounded-full bg-gray-700"></span>
-                            Pending
+                            等待中
                         </span>
                     </td>
                 `;
@@ -799,9 +912,9 @@
                 : 0;
             const progress = total ? Math.round((processed / total) * 100) : 0;
 
-            batchProgressText.textContent = `${processed} / ${total} Processed`;
-            batchSummaryMini.textContent = `${successCount} Success · ${failedCount} Failed`;
-            batchFinalSummary.textContent = `${successCount} Success · ${failedCount} Failed · Avg Score ${averageScore.toFixed(1)}%`;
+            batchProgressText.textContent = `${processed} / ${total} 已处理`;
+            batchSummaryMini.textContent = `${successCount} 成功 · ${failedCount} 失败`;
+            batchFinalSummary.textContent = `${successCount} 成功 · ${failedCount} 失败 · 平均分 ${averageScore.toFixed(1)}%`;
             batchProgressBar.style.width = `${progress}%`;
         }
 
@@ -818,18 +931,18 @@
             const cells = row.element.children;
             cells[1].innerHTML = `
                 <div class="text-gray-200 leading-relaxed">${escapeHtml(truncateText(row.raw_address, 70))}</div>
-                <div class="text-[10px] text-gray-600 font-mono uppercase tracking-[0.2em] mt-2">${escapeHtml(item.status)}</div>
+                <div class="text-[10px] text-gray-600 font-mono uppercase tracking-[0.2em] mt-2">${escapeHtml(statusTextZh(item.status))}</div>
             `;
             cells[2].innerHTML = row.formatted_text
                 ? `<div class="text-blue-50 leading-relaxed">${escapeHtml(truncateText(row.formatted_text.replace(/\n/g, ' / '), 84))}</div>`
-                : `<div class="text-red-300 leading-relaxed">${escapeHtml(truncateText(row.error || 'No output', 84))}</div>`;
+                : `<div class="text-red-300 leading-relaxed">${escapeHtml(truncateText(row.error || '无输出', 84))}</div>`;
             cells[3].innerHTML = row.status === 'success'
                 ? `<span class="font-mono text-xs ${scoreClass(row.score)}">${row.score.toFixed(1)}</span>`
                 : '<span class="font-mono text-xs text-red-400">0.0</span>';
             cells[4].innerHTML = `
                 <span class="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] ${row.status === 'success' ? 'text-gray-300' : 'text-red-300'}">
                     <span class="w-2 h-2 rounded-full ${getBatchStatusDotClass(row.status)}"></span>
-                    ${escapeHtml(row.status)}
+                    ${escapeHtml(statusTextZh(row.status))}
                 </span>
             `;
 
@@ -838,10 +951,10 @@
 
         function setBatchRunningState(isRunning) {
             batchRunBtn.disabled = isRunning;
-            batchRunBtnText.textContent = isRunning ? 'Streaming...' : 'Run Batch';
+            batchRunBtnText.textContent = isRunning ? '流式处理中...' : '开始批量处理';
             batchCancelBtn.classList.toggle('hidden', !isRunning);
             if (isRunning) {
-                batchStatusText.textContent = 'Batch Stream Live';
+                batchStatusText.textContent = '批量流式处理中';
                 batchStatusText.className = 'text-xs text-primary font-mono uppercase tracking-[0.2em] animate-pulse';
             }
         }
@@ -852,7 +965,7 @@
                 batchAbortController = null;
             }
             setBatchRunningState(false);
-            batchStatusText.textContent = 'Batch Cancelled';
+            batchStatusText.textContent = '批量任务已取消';
             batchStatusText.className = 'text-xs text-yellow-500 font-mono uppercase tracking-[0.2em]';
         }
 
@@ -876,13 +989,19 @@
         async function runBatchNormalize() {
             const hasFile = batchSelectedFile;
             const hasText = batchTextInput.value.trim();
-            if (batchSourceMode === 'upload' && !hasFile && !hasText) {
-                batchStatusText.textContent = 'Select A File Or Paste Text';
+            const previewText = getEditedPreviewText();
+            if (batchSourceMode === 'upload' && !hasFile) {
+                batchStatusText.textContent = '请先选择文件';
                 batchStatusText.className = 'text-xs text-red-500 font-mono uppercase tracking-[0.2em]';
                 return;
             }
-            if (batchSourceMode === 'paste' && !hasText && !hasFile) {
-                batchStatusText.textContent = 'Paste Addresses First';
+            if (batchSourceMode === 'upload' && !previewText) {
+                batchStatusText.textContent = '请先解析文件';
+                batchStatusText.className = 'text-xs text-red-500 font-mono uppercase tracking-[0.2em]';
+                return;
+            }
+            if (batchSourceMode === 'paste' && !hasText) {
+                batchStatusText.textContent = '请先粘贴地址';
                 batchStatusText.className = 'text-xs text-red-500 font-mono uppercase tracking-[0.2em]';
                 return;
             }
@@ -892,8 +1011,12 @@
             batchAbortController = new AbortController();
 
             const formData = new FormData();
-            if (hasFile) formData.append('file', batchSelectedFile);
-            if (hasText) formData.append('text', hasText);
+            if (batchSourceMode === 'upload') {
+                formData.append('text', getEditedPreviewText());
+            }
+            if (batchSourceMode === 'paste' && hasText) {
+                formData.append('text', hasText);
+            }
             formData.append('provider', batchSelectedProvider);
             formData.append('use_online_verify', batchOnlineVerify.checked ? 'true' : 'false');
             formData.append('address_column', batchAddressColumn.value.trim() || 'address');
@@ -931,12 +1054,12 @@
                             renderBatchItem(payload);
                         } else if (payload.type === 'done') {
                             updateBatchSummary(payload.total || batchRows.length);
-                            batchSummaryMini.textContent = 'Batch Complete';
+                            batchSummaryMini.textContent = '批量处理完成';
                             batchDownloadBtn.disabled = false;
-                            batchStatusText.textContent = 'Batch Complete';
+                            batchStatusText.textContent = '批量处理完成';
                             batchStatusText.className = 'text-xs text-green-500 font-mono uppercase tracking-[0.2em]';
                         } else if (payload.type === 'error') {
-                            batchStatusText.textContent = payload.message || 'Batch Error';
+                            batchStatusText.textContent = payload.message || '批量处理错误';
                             batchStatusText.className = 'text-xs text-red-500 font-mono uppercase tracking-[0.2em]';
                         }
                     });
@@ -952,10 +1075,10 @@
                 }
             } catch (err) {
                 if (err.name === 'AbortError') {
-                    batchStatusText.textContent = 'Batch Cancelled';
+                    batchStatusText.textContent = '批量任务已取消';
                     batchStatusText.className = 'text-xs text-yellow-500 font-mono uppercase tracking-[0.2em]';
                 } else {
-                    batchStatusText.textContent = err.message || 'Batch Error';
+                    batchStatusText.textContent = err.message || '批量处理错误';
                     batchStatusText.className = 'text-xs text-red-500 font-mono uppercase tracking-[0.2em]';
                 }
             } finally {
@@ -967,11 +1090,11 @@
         // ── 进入解析中状态 ──────────────────────────────────
         function setParsingState() {
             parseBtn.disabled = true;
-            parseBtnText.textContent = 'PROCESSING...';
+            parseBtnText.textContent = '解析中...';
             parseBtnText.classList.add('animate-pulse');
             parseBtnIcon.style.display = 'none';
             scanLine.classList.add('animate-scan', 'opacity-50');
-            statusText.textContent = 'AI INFERENCING';
+            statusText.textContent = 'AI 推理中';
             statusText.className = 'text-xs font-mono text-primary animate-pulse';
             emptyState.style.opacity = '0';
             errorState.classList.add('hidden');
@@ -981,7 +1104,7 @@
         // ── 恢复按钮初始状态 ────────────────────────────────
         function resetBtnState() {
             parseBtn.disabled = false;
-            parseBtnText.textContent = 'Initiate Parse';
+            parseBtnText.textContent = '开始解析';
             parseBtnText.classList.remove('animate-pulse');
             parseBtnIcon.style.display = '';
             scanLine.classList.remove('animate-scan', 'opacity-50');
@@ -1044,10 +1167,10 @@
 
             // 更新状态文字
             if (data.is_mock) {
-                statusText.textContent = 'DEMO MODE';
+                statusText.textContent = '演示模式';
                 statusText.className = 'text-xs font-mono text-yellow-500';
             } else {
-                statusText.textContent = 'COMPLETE';
+                statusText.textContent = '完成';
                 statusText.className = 'text-xs font-mono text-green-500';
             }
         });
@@ -1083,6 +1206,9 @@
             setBatchFile(files[0]);
         });
 
+        batchParseBtn.addEventListener('click', parseBatchFile);
+        batchPreviewClearBtn.addEventListener('click', clearBatchPreview);
+        batchPreviewTextarea.addEventListener('input', updateBatchPreviewCount);
         batchRunBtn.addEventListener('click', runBatchNormalize);
         batchCancelBtn.addEventListener('click', cancelBatchRun);
         batchDownloadBtn.addEventListener('click', () => {

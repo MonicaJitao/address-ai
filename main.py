@@ -133,6 +133,11 @@ class NormalizeResponse(BaseModel):
     processing_time_ms: int
 
 
+class BatchPreviewResponse(BaseModel):
+    addresses: list[str]
+    count: int
+
+
 async def _build_batch_addresses(
     file: UploadFile | None,
     text: str | None,
@@ -335,6 +340,22 @@ async def api_normalize_batch(
         media_type="application/x-ndjson; charset=utf-8",
         headers=headers,
     )
+
+
+@app.post("/api/normalize/batch/preview", response_model=BatchPreviewResponse)
+async def api_normalize_batch_preview(
+    file: UploadFile | None = File(default=None),
+    text: str | None = Form(default=None),
+    address_column: str = Form(default="address"),
+):
+    try:
+        addresses = await _build_batch_addresses(file, text, address_column)
+        return BatchPreviewResponse(addresses=addresses, count=len(addresses))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.exception("批量预览解析失败：%s", exc)
+        raise HTTPException(status_code=500, detail="批量输入解析失败")
 
 
 @app.get("/api/health")

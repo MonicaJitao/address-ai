@@ -11,6 +11,41 @@ class BatchApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.client = TestClient(app)
 
+    def test_batch_preview_endpoint_returns_text_addresses(self) -> None:
+        response = self.client.post(
+            "/api/normalize/batch/preview",
+            data={
+                "text": "深圳市南山区科技园 1 号\n福田区中心一路 8 号",
+                "address_column": "address",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "addresses": ["深圳市南山区科技园 1 号", "福田区中心一路 8 号"],
+                "count": 2,
+            },
+        )
+
+    def test_batch_preview_endpoint_parses_csv_file(self) -> None:
+        response = self.client.post(
+            "/api/normalize/batch/preview",
+            data={"address_column": "address"},
+            files={
+                "file": (
+                    "addresses.csv",
+                    "address\n深圳市南山区科技园 1 号\n福田区中心一路 8 号\n",
+                    "text/csv",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["count"], 2)
+        self.assertEqual(response.json()["addresses"][0], "深圳市南山区科技园 1 号")
+
     def test_batch_endpoint_requires_file_or_text(self) -> None:
         response = self.client.post(
             "/api/normalize/batch",
