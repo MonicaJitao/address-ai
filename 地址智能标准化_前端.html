@@ -383,6 +383,17 @@
         </section>
     </main>
 
+    <!-- 批量详情弹窗 -->
+    <div id="detailModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="detailModalTitle">
+        <div class="relative bg-gray-950 border border-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col mx-4">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800 shrink-0">
+                <h2 id="detailModalTitle" class="text-sm font-mono uppercase tracking-[0.2em] text-gray-200">地址详情</h2>
+                <button id="detailModalClose" class="text-gray-500 hover:text-gray-200 transition-colors text-xl leading-none" aria-label="关闭">✕</button>
+            </div>
+            <div id="detailModalBody" class="overflow-y-auto px-6 py-5 space-y-5 text-sm text-gray-300"></div>
+        </div>
+    </div>
+
     <!-- ══════════════════════════════════════════════════ -->
     <!--  前端 JS：对接后端 API，动态渲染解析结果            -->
     <!-- ══════════════════════════════════════════════════ -->
@@ -897,6 +908,13 @@
                     score: 0,
                     error: '',
                     element: tr,
+                    scores: null,
+                    validation: null,
+                    parsed: null,
+                    formatted_address: [],
+                    model_used: null,
+                    provider: null,
+                    processing_time_ms: 0,
                 });
                 batchTableBody.appendChild(tr);
             }
@@ -927,6 +945,13 @@
             row.formatted_text = item.formatted_text || '';
             row.score = Number(item.score || 0);
             row.error = item.error || '';
+            row.scores = item.scores || null;
+            row.validation = item.validation || null;
+            row.parsed = item.parsed || null;
+            row.formatted_address = item.formatted_address || [];
+            row.model_used = item.model_used || null;
+            row.provider = item.provider || null;
+            row.processing_time_ms = item.processing_time_ms || 0;
 
             const cells = row.element.children;
             cells[1].innerHTML = `
@@ -945,6 +970,14 @@
                     ${escapeHtml(statusTextZh(row.status))}
                 </span>
             `;
+
+            if (row.status === 'success') {
+                row.element.classList.add('cursor-pointer', 'hover:bg-gray-900/50', 'transition-colors');
+                row.element.onclick = () => openDetailModal(row);
+            } else {
+                row.element.classList.remove('cursor-pointer', 'hover:bg-gray-900/50', 'transition-colors');
+                row.element.onclick = null;
+            }
 
             updateBatchSummary(item.total || batchRows.length);
         }
@@ -1221,6 +1254,125 @@
             link.click();
             URL.revokeObjectURL(url);
         });
+
+        // ── 详情弹窗 ──────────────────────────────────────────────────────────
+        const detailModal = document.getElementById('detailModal');
+        const detailModalBody = document.getElementById('detailModalBody');
+        const detailModalClose = document.getElementById('detailModalClose');
+
+        function openDetailModal(row) {
+            detailModalBody.innerHTML = buildDetailContent(row);
+            detailModal.classList.remove('hidden');
+            detailModal.classList.add('flex');
+            document.addEventListener('keydown', onDetailEscape);
+        }
+
+        function closeDetailModal() {
+            detailModal.classList.add('hidden');
+            detailModal.classList.remove('flex');
+            document.removeEventListener('keydown', onDetailEscape);
+        }
+
+        function onDetailEscape(e) {
+            if (e.key === 'Escape') closeDetailModal();
+        }
+
+        detailModalClose.addEventListener('click', closeDetailModal);
+        detailModal.addEventListener('click', (e) => { if (e.target === detailModal) closeDetailModal(); });
+
+        function matchStatusLabel(status) {
+            const map = {
+                strong_match:    { text: '强匹配',   color: 'text-green-400' },
+                partial_match:   { text: '部分匹配', color: 'text-blue-400' },
+                weak_match:      { text: '弱匹配',   color: 'text-yellow-400' },
+                ambiguous_match: { text: '模糊匹配', color: 'text-yellow-500' },
+                mismatch:        { text: '不匹配',   color: 'text-red-400' },
+                no_match:        { text: '无匹配',   color: 'text-red-500' },
+                api_error:       { text: 'API 错误', color: 'text-orange-400' },
+                disabled:        { text: '已禁用',   color: 'text-gray-500' },
+                skipped:         { text: '已跳过',   color: 'text-gray-500' },
+            };
+            return map[status] || { text: status || '—', color: 'text-gray-400' };
+        }
+
+        function detailSection(title, content) {
+            return `<div class="space-y-2">
+                <div class="text-[10px] font-mono uppercase tracking-[0.2em] text-gray-500 border-b border-gray-800 pb-1">${escapeHtml(title)}</div>
+                ${content}
+            </div>`;
+        }
+
+        function detailRow(label, value, valueClass) {
+            return `<div class="flex gap-3">
+                <span class="text-gray-500 shrink-0 w-28 text-xs">${escapeHtml(label)}</span>
+                <span class="text-xs ${valueClass || 'text-gray-200'} break-all">${value}</span>
+            </div>`;
+        }
+
+        function renderIssuesList(issues) {
+            if (!issues || !issues.length) return `<span class="text-xs text-gray-600">无</span>`;
+            return `<ul class="list-disc list-inside space-y-0.5">${issues.map(i => `<li class="text-xs text-yellow-400">${escapeHtml(String(i))}</li>`).join('')}</ul>`;
+        }
+
+        function buildDetailContent(row) {
+            const parts = [];
+            const scores = row.scores || {};
+            const validation = row.validation || {};
+
+            parts.push(detailSection('地址信息', [
+                detailRow('原始地址', escapeHtml(row.raw_address || '—')),
+                detailRow('标准化输出', escapeHtml(row.formatted_text ? row.formatted_text.replace(/\n/g, ' / ') : '—'), 'text-blue-300'),
+                detailRow('模型', escapeHtml(row.model_used || '—'), 'text-gray-400'),
+                detailRow('供应商', escapeHtml(row.provider || '—'), 'text-gray-400'),
+                detailRow('耗时', row.processing_time_ms ? `${row.processing_time_ms} ms` : '—', 'text-gray-400'),
+            ].join('')));
+
+            const scoreItems = [
+                ['总分',   scores.total_score],
+                ['解析',   scores.parse_score],
+                ['翻译',   scores.translation_score],
+                ['格式',   scores.format_score],
+                ['知识库', scores.knowledge_score],
+                ['在线验证', scores.online_verify_score],
+            ];
+            parts.push(detailSection('评分拆解', scoreItems.map(([label, val]) => {
+                const num = val != null ? Number(val) : null;
+                const display = num != null ? `${num.toFixed(1)}` : '—';
+                const cls = num == null ? 'text-gray-500' : num >= 80 ? 'text-green-400' : num >= 60 ? 'text-yellow-400' : 'text-red-400';
+                return detailRow(label, display, cls);
+            }).join('')));
+
+            const layer1 = validation.layer1_rules || {};
+            parts.push(detailSection('第一层：规则校验', [
+                detailRow('通过', layer1.passed != null ? (layer1.passed ? '✓ 是' : '✗ 否') : '—', layer1.passed ? 'text-green-400' : 'text-red-400'),
+                `<div class="flex gap-3"><span class="text-gray-500 shrink-0 w-28 text-xs">Issues</span><div>${renderIssuesList(layer1.issues)}</div></div>`,
+            ].join('')));
+
+            const layer2 = validation.layer2_knowledge || {};
+            parts.push(detailSection('第二层：知识库校验', [
+                detailRow('通过', layer2.passed != null ? (layer2.passed ? '✓ 是' : '✗ 否') : '—', layer2.passed ? 'text-green-400' : 'text-red-400'),
+                detailRow('省份验证', layer2.province_verified != null ? (layer2.province_verified ? '✓' : '✗') : '—', layer2.province_verified ? 'text-green-400' : 'text-red-400'),
+                detailRow('城市验证', layer2.city_verified != null ? (layer2.city_verified ? '✓' : '✗') : '—', layer2.city_verified ? 'text-green-400' : 'text-red-400'),
+                `<div class="flex gap-3"><span class="text-gray-500 shrink-0 w-28 text-xs">Issues</span><div>${renderIssuesList(layer2.issues)}</div></div>`,
+            ].join('')));
+
+            const layer3 = validation.layer3_online || {};
+            const ms = matchStatusLabel(layer3.match_status);
+            const sugAddr = layer3.suggested_zh_address;
+            const sugConf = layer3.suggested_zh_confidence;
+            const sugReason = layer3.suggested_zh_reason;
+            parts.push(detailSection('第三层：高德在线校验', [
+                detailRow('匹配状态', `<span class="${ms.color}">${escapeHtml(ms.text)}</span>`),
+                detailRow('高德返回地址', escapeHtml(layer3.amap_address || '—'), 'text-gray-300'),
+                sugAddr ? detailRow('建议中文地址', escapeHtml(sugAddr), 'text-blue-300') : '',
+                sugConf ? detailRow('建议置信度', escapeHtml(sugConf), 'text-gray-400') : '',
+                sugReason ? detailRow('建议依据', escapeHtml(sugReason), 'text-gray-400') : '',
+                `<div class="flex gap-3"><span class="text-gray-500 shrink-0 w-28 text-xs">Issues</span><div>${renderIssuesList(layer3.issues)}</div></div>`,
+            ].join('')));
+
+            return parts.join('');
+        }
+        // ── 详情弹窗结束 ──────────────────────────────────────────────────────
 
         resetBatchResults();
     </script>

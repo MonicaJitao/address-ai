@@ -38,6 +38,8 @@ logging.basicConfig(
     level=logging.DEBUG if os.getenv("DEBUG", "false").lower() == "true" else logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger("main")
 
 
@@ -172,6 +174,12 @@ async def _process_single_batch_item(index: int, total: int, raw_address: str, u
             "status": "success",
             "error": None,
             "processing_time_ms": int(result.get("processing_time_ms", 0) or 0),
+            "scores": result.get("scores"),
+            "validation": result.get("validation"),
+            "parsed": result.get("parsed"),
+            "formatted_address": result.get("formatted_address", []),
+            "model_used": result.get("model_used"),
+            "provider": result.get("provider", provider),
         }
     except RuntimeError as exc:
         logger.warning("批量单条处理失败(index=%s): %s", index, exc)
@@ -185,6 +193,12 @@ async def _process_single_batch_item(index: int, total: int, raw_address: str, u
             "status": "failed",
             "error": str(exc),
             "processing_time_ms": 0,
+            "scores": None,
+            "validation": None,
+            "parsed": None,
+            "formatted_address": [],
+            "model_used": None,
+            "provider": provider,
         }
     except Exception as exc:
         logger.exception("批量单条处理出现未知错误(index=%s): %s", index, exc)
@@ -198,6 +212,12 @@ async def _process_single_batch_item(index: int, total: int, raw_address: str, u
             "status": "failed",
             "error": "服务器处理异常，请稍后重试",
             "processing_time_ms": 0,
+            "scores": None,
+            "validation": None,
+            "parsed": None,
+            "formatted_address": [],
+            "model_used": None,
+            "provider": provider,
         }
 
 
